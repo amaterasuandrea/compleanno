@@ -1,0 +1,3545 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>La Pietra Più Rara</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#eae2d6;
+    --panel:#0a0908;
+    --edge:#eae2d6;
+    --accent:#ffb066;
+    --white-ore:#f4f6fb;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#000;font-family:'VT323',monospace;touch-action:none;user-select:none;-webkit-user-select:none;}
+  #app{position:fixed;inset:0;}
+  canvas{display:block;width:100%;height:100%;}
+
+  /* vignette cinematografico */
+  #vignette{
+    position:fixed;inset:0;pointer-events:none;z-index:5;
+    background:radial-gradient(ellipse at center, rgba(0,0,0,0) 42%, rgba(0,0,0,0.6) 100%);
+  }
+  #grain{
+    position:fixed;inset:0;pointer-events:none;z-index:6;opacity:.035;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  #fogNear{
+    position:fixed;inset:0;pointer-events:none;z-index:3;opacity:.5;
+    background:radial-gradient(ellipse at 50% 100%, rgba(190,175,150,.10) 0%, rgba(0,0,0,0) 55%);
+  }
+
+  /* crosshair */
+  #crosshair{
+    position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:6px;height:6px;border-radius:50%;background:rgba(234,226,214,.75);
+    box-shadow:0 0 6px rgba(234,226,214,.5);z-index:4;display:none;
+    transition:transform .12s ease, background .12s ease;
+  }
+  #crosshair.hit{transform:translate(-50%,-50%) scale(2.4);background:rgba(255,255,255,.95);}
+
+  /* hint interazione */
+  #interactHint{
+    position:fixed;left:50%;bottom:22%;transform:translate(-50%,0);
+    color:var(--ink);font-family:'VT323',monospace;font-size:26px;letter-spacing:1px;
+    text-shadow:0 2px 6px #000;z-index:7;display:none;pointer-events:none;text-align:center;
+    animation:floaty 1.6s ease-in-out infinite;
+  }
+  @keyframes floaty{0%,100%{transform:translate(-50%,0);}50%{transform:translate(-50%,-6px);}}
+
+  /* hint movimento iniziale */
+  #moveHint{
+    position:fixed;left:50%;top:14%;transform:translate(-50%,0);
+    color:var(--ink);font-family:'VT323',monospace;font-size:22px;text-align:center;
+    text-shadow:0 2px 6px #000;z-index:7;opacity:0;transition:opacity 1.5s ease;pointer-events:none;
+  }
+
+  /* titolo */
+  #titleScreen{
+    position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at 50% 30%, #14100c 0%, #050403 75%);
+    text-align:center;padding:20px;
+  }
+  #titleScreen h1{
+    font-family:'Press Start 2P',monospace;color:var(--ink);font-size:clamp(18px,4vw,34px);
+    letter-spacing:2px;margin:0 0 18px 0;line-height:1.6;text-shadow:0 0 18px rgba(255,176,102,.35);
+  }
+  #titleScreen p.sub{
+    font-family:'VT323',monospace;color:#b7ab99;font-size:22px;margin:0 0 40px 0;max-width:520px;
+  }
+  .pixelBtn{
+    font-family:'Press Start 2P',monospace;font-size:13px;color:var(--ink);background:#141210;
+    border:3px solid var(--ink);padding:16px 28px;cursor:pointer;letter-spacing:1px;
+  }
+  .pixelBtn:hover{background:var(--ink);color:#141210;}
+  #titleScreen .credit{position:absolute;bottom:18px;font-size:14px;color:#5a5245;font-family:'VT323',monospace;text-align:center;padding:0 20px;}
+
+  /* paused overlay */
+  #pausedScreen{
+    position:fixed;inset:0;z-index:15;display:none;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.35);color:var(--ink);font-family:'VT323',monospace;font-size:26px;
+    text-shadow:0 2px 6px #000;
+  }
+
+  /* dialogue box */
+  #dialogueWrap{
+    position:fixed;left:50%;bottom:6%;transform:translateX(-50%);width:min(760px,88vw);z-index:10;display:none;
+  }
+  #dialogueBox{
+    background:rgba(8,7,6,.92);border:3px solid var(--ink);padding:22px 26px;min-height:98px;position:relative;
+    box-shadow:0 10px 30px rgba(0,0,0,.6);
+  }
+  #dialogueText{
+    color:var(--ink);font-family:'VT323',monospace;font-size:27px;line-height:1.35;white-space:pre-wrap;
+  }
+  #dialogueName{
+    position:absolute;top:-16px;left:18px;background:#050403;border:3px solid var(--ink);padding:2px 12px;
+    font-family:'Press Start 2P',monospace;font-size:11px;color:var(--accent);
+  }
+  #advancePrompt{
+    position:absolute;right:20px;bottom:12px;color:var(--ink);font-size:20px;animation:floaty 1s ease-in-out infinite;
+    display:none;
+  }
+
+  /* choice */
+  #choiceWrap{
+    display:none;gap:12px;margin-top:12px;flex-wrap:wrap;
+  }
+  .choiceBtn{
+    flex:1;min-width:180px;background:#141210;border:2px solid var(--ink);color:var(--ink);
+    font-family:'VT323',monospace;font-size:24px;padding:12px 14px;cursor:pointer;text-align:center;
+  }
+  .choiceBtn:hover{background:var(--ink);color:#141210;}
+
+  /* ===== HUD di gioco ===== */
+  #hud{
+    position:fixed;top:18px;left:18px;z-index:8;display:none;
+    font-family:'VT323',monospace;color:var(--ink);text-shadow:0 2px 6px #000;
+    user-select:none;
+  }
+  #hearts{display:flex;gap:7px;margin-bottom:8px;}
+  .heart{width:22px;height:20px;animation:heartbeat 2.4s ease-in-out infinite;}
+  .heart svg{width:100%;height:100%;display:block;filter:drop-shadow(0 2px 3px rgba(0,0,0,.7));}
+  .heart path{fill:var(--accent);}
+  @keyframes heartbeat{
+    0%,100%{transform:scale(1);} 8%{transform:scale(1.16);} 16%{transform:scale(1);}
+    24%{transform:scale(1.1);} 32%{transform:scale(1);}
+  }
+  #depthReadout{font-size:21px;letter-spacing:.5px;line-height:1.3;}
+  #depthReadout .stageName{color:var(--accent);}
+  #progressTrack{
+    display:flex;gap:4px;margin-top:8px;
+  }
+  .progressPip{width:26px;height:5px;background:#3a3327;border:1px solid #59503e;}
+  .progressPip.on{background:var(--accent);border-color:var(--accent);box-shadow:0 0 6px rgba(255,176,102,.6);}
+  #symbolTracker{margin-top:9px;font-size:16px;color:#b7ab99;display:flex;gap:7px;align-items:center;}
+  .symbolPip{width:15px;height:15px;border:1px solid #6a5f4d;border-radius:2px;opacity:.32;display:flex;align-items:center;justify-content:center;}
+  .symbolPip svg{width:70%;height:70%;opacity:.7;}
+  .symbolPip.on{opacity:1;border-color:var(--accent);box-shadow:0 0 6px rgba(255,176,102,.55);}
+
+  /* hotbar */
+  #hotbar{
+    position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:8;display:none;
+    gap:8px;
+  }
+  .slot{
+    width:54px;height:54px;background:rgba(10,9,8,.74);border:2px solid #59503e;
+    display:flex;align-items:center;justify-content:center;flex-direction:column;position:relative;
+  }
+  .slot.active{border-color:var(--ink);}
+  .slot.pickSlot{border-color:var(--accent);box-shadow:0 0 10px rgba(255,176,102,.35);}
+  .slot .glyph{font-size:26px;line-height:1;}
+  .slot .count{position:absolute;bottom:1px;right:5px;font-size:14px;color:var(--ink);}
+  .oreDot{width:14px;height:14px;border-radius:2px;background:linear-gradient(160deg,#ffffff,#c9d6e8);box-shadow:0 0 7px rgba(255,255,255,.8);}
+
+  /* banner missione */
+  #questBanner{
+    position:fixed;left:50%;top:11%;transform:translate(-50%,-8px);z-index:9;display:none;
+    background:rgba(8,7,6,.88);border:2px solid var(--accent);color:var(--ink);
+    font-family:'VT323',monospace;font-size:23px;padding:11px 22px;text-align:center;
+    max-width:min(560px,80vw);opacity:0;transition:opacity .5s ease, transform .5s ease;
+    box-shadow:0 8px 24px rgba(0,0,0,.5);
+  }
+  #questBanner.show{opacity:1;transform:translate(-50%,0);}
+
+  /* ending */
+  #endingScreen{
+    position:fixed;inset:0;z-index:25;display:none;align-items:center;justify-content:center;flex-direction:column;
+    background:#000;text-align:center;padding:40px;opacity:0;transition:opacity 2.4s ease;
+  }
+  #endingPhotoWrap{
+    width:min(300px,62vw);aspect-ratio:1/1;border:4px solid var(--ink);margin:0 auto 30px auto;
+    background:radial-gradient(ellipse at center, #2a2015 0%, #0c0a08 80%);
+    display:flex;align-items:center;justify-content:center;overflow:hidden;
+    box-shadow:0 0 46px rgba(255,176,102,.28);position:relative;
+  }
+  #endingPhotoWrap img{width:100%;height:100%;object-fit:cover;display:none;}
+  #endingPhotoWrap .placeholderMark{opacity:.5;}
+  #endingPhotoWrap .placeholderMark svg{width:56%;height:56%;}
+  #endingPhotoWrap .placeholderMark path{fill:var(--accent);}
+  #endingScreen h2{
+    font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:500;color:var(--accent);
+    font-size:clamp(22px,4vw,34px);margin:0 0 22px 0;
+  }
+  #endingScreen p{
+    font-family:'Cormorant Garamond',serif;font-weight:500;color:var(--ink);font-size:clamp(18px,2.6vw,24px);
+    max-width:640px;line-height:1.7;margin:0 0 34px 0;
+  }
+
+  /* fade nero */
+  #blackout{position:fixed;inset:0;background:#000;z-index:18;opacity:0;pointer-events:none;transition:opacity 2.2s ease;}
+  #whiteFlash{position:fixed;inset:0;background:#fff;z-index:17;opacity:0;pointer-events:none;}
+
+  /* mute */
+  #muteBtn{
+    position:fixed;top:16px;right:16px;z-index:12;width:38px;height:38px;border:2px solid var(--ink);
+    background:rgba(10,9,8,.7);color:var(--ink);font-family:'VT323',monospace;font-size:18px;
+    cursor:pointer;display:none;align-items:center;justify-content:center;
+  }
+
+  /* Controlli Mobile */
+  #mobileControls {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 11;
+    display: none;
+  }
+  #joystickContainer {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    border: 3px solid var(--ink);
+    background: rgba(10, 9, 8, 0.55);
+    pointer-events: auto;
+    touch-action: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+  }
+  #joystickKnob {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--ink);
+    border: 2px solid var(--panel);
+    box-shadow: 0 0 6px rgba(0,0,0,0.6);
+  }
+  #mobileActionButton {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 3px solid var(--ink);
+    background: rgba(10, 9, 8, 0.85);
+    color: var(--ink);
+    font-family: 'VT323', monospace;
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    pointer-events: auto;
+    touch-action: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 12px rgba(255, 176, 102, 0.25);
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #mobileActionButton:active, #mobileActionButton.interact-active:active {
+    background: var(--accent);
+    color: var(--panel);
+    box-shadow: 0 0 18px var(--accent);
+  }
+  #mobileActionButton.interact-active {
+    border-color: var(--accent);
+    box-shadow: 0 0 15px rgba(255, 176, 102, 0.4);
+    color: var(--accent);
+  }
+
+  /* Overlay Orientamento Portrait */
+  #portraitOverlay {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 30%, #14100c 0%, #050403 75%);
+    z-index: 999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink);
+    text-align: center;
+    padding: 20px;
+    font-family: 'VT323', monospace;
+  }
+  #portraitOverlay .message-box {
+    border: 3px solid var(--ink);
+    background: var(--panel);
+    padding: 25px;
+    max-width: 90%;
+    box-shadow: 0 0 20px rgba(255,176,102,0.3);
+  }
+  #portraitOverlay .phone-icon {
+    font-size: 50px;
+    margin-bottom: 12px;
+    animation: rotatePhone 2s ease-in-out infinite;
+  }
+  #portraitOverlay h2 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 14px;
+    margin-bottom: 12px;
+    color: var(--accent);
+    line-height: 1.4;
+  }
+  #portraitOverlay p {
+    font-size: 20px;
+    line-height: 1.35;
+    color: #b7ab99;
+    margin: 0;
+  }
+  @keyframes rotatePhone {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(-90deg); }
+  }
+
+  /* Media Query per Landscape Mobile (altezza ridotta) */
+  @media (max-height: 500px) {
+    #dialogueWrap {
+      bottom: 2%;
+      width: 94vw;
+    }
+    #dialogueBox {
+      padding: 10px 16px;
+      min-height: 62px;
+      border-width: 2px;
+    }
+    #dialogueText {
+      font-size: 19px;
+      line-height: 1.25;
+    }
+    #dialogueName {
+      font-size: 9px;
+      top: -12px;
+      padding: 1px 8px;
+      border-width: 2px;
+    }
+    #advancePrompt {
+      right: 12px;
+      bottom: 6px;
+      font-size: 14px;
+    }
+    .choiceBtn {
+      font-size: 18px;
+      padding: 10px 14px;
+      min-width: 120px;
+    }
+    #interactHint {
+      bottom: 26%;
+      font-size: 20px;
+    }
+    #moveHint {
+      font-size: 16px;
+      top: 10%;
+    }
+    #hud {
+      top: 10px;
+      left: 10px;
+    }
+    .heart {
+      width: 16px;
+      height: 14px;
+    }
+    #depthReadout {
+      font-size: 16px;
+    }
+    #progressTrack {
+      margin-top: 4px;
+    }
+    .progressPip {
+      width: 18px;
+      height: 4px;
+    }
+    #symbolTracker {
+      margin-top: 5px;
+      font-size: 12px;
+    }
+    .symbolPip {
+      width: 12px;
+      height: 12px;
+    }
+    #hotbar {
+      bottom: 10px;
+      gap: 4px;
+    }
+    .slot {
+      width: 38px;
+      height: 38px;
+      border-width: 1px;
+    }
+    .slot .glyph {
+      font-size: 18px;
+    }
+    .slot .count {
+      font-size: 10px;
+      bottom: 0px;
+      right: 3px;
+    }
+    .oreDot {
+      width: 10px;
+      height: 10px;
+    }
+    #questBanner {
+      font-size: 16px;
+      padding: 6px 14px;
+      top: 8%;
+    }
+    #muteBtn {
+      top: 10px;
+      right: 10px;
+      width: 44px;
+      height: 44px;
+      font-size: 22px;
+    }
+    #titleScreen {
+      padding: 10px;
+    }
+    #titleScreen h1 {
+      font-size: 20px;
+      margin-bottom: 8px;
+    }
+    #titleScreen p.sub {
+      font-size: 14px;
+      margin-bottom: 12px;
+      max-width: 460px;
+    }
+    .pixelBtn {
+      padding: 10px 18px;
+      font-size: 10px;
+    }
+    #titleScreen .credit {
+      bottom: 8px;
+      font-size: 10px;
+    }
+
+    #endingScreen[style*="display: flex"],
+    #endingScreen[style*="display:flex"] {
+      display: grid !important;
+      grid-template-columns: auto auto 1fr;
+      grid-template-rows: auto 1fr auto;
+      grid-template-areas:
+        "photo canvas title"
+        "photo canvas message"
+        "photo canvas button";
+      gap: 8px 24px;
+      padding: 20px 40px;
+      align-content: center;
+      justify-content: center;
+      align-items: center;
+      text-align: left;
+    }
+    #endingPhotoWrap {
+      grid-area: photo;
+      width: min(150px, 35vh);
+      height: min(150px, 35vh);
+      margin: 0 !important;
+      border-width: 2px;
+    }
+    #pixelHugCanvas {
+      grid-area: canvas;
+      width: min(130px, 30vh) !important;
+      height: min(130px, 30vh) !important;
+      margin: 0 !important;
+    }
+    #endingScreen h2 {
+      grid-area: title;
+      font-size: clamp(16px, 4.5vh, 22px) !important;
+      margin: 0 !important;
+      line-height: 1.2;
+    }
+    #endingScreen p {
+      grid-area: message;
+      font-size: clamp(13px, 3.8vh, 17px) !important;
+      max-width: 500px;
+      line-height: 1.35;
+      margin: 0 !important;
+    }
+    #replayBtn {
+      grid-area: button;
+      padding: 8px 16px;
+      font-size: 10px;
+      margin: 0 !important;
+      justify-self: start;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="vignette"></div>
+  <div id="fogNear"></div>
+  <div id="grain"></div>
+  <div id="whiteFlash"></div>
+  <div id="crosshair"></div>
+  <div id="interactHint">[ E ]  interagisci</div>
+  <div id="moveHint">WASD per muoverti · mouse per guardarti intorno · click per scavare</div>
+  <button id="muteBtn" title="audio">♪</button>
+
+  <div id="hud">
+    <div id="hearts"></div>
+    <div id="depthReadout"><b id="levelNum">1</b> · <span class="stageName" id="stageName">INGRESSO</span><br>PROFONDITÀ <span id="depthVal">12</span>m</div>
+    <div id="progressTrack"></div>
+    <div id="symbolTracker"></div>
+  </div>
+
+  <div id="hotbar"></div>
+  <div id="questBanner"></div>
+
+  <div id="dialogueWrap">
+    <div id="dialogueBox">
+      <div id="dialogueName">ANDREA</div>
+      <div id="dialogueText"></div>
+      <div id="choiceWrap"></div>
+      <div id="advancePrompt">▼</div>
+    </div>
+  </div>
+
+  <div id="pausedScreen">Clicca per continuare</div>
+  <div id="blackout"></div>
+
+  <div id="endingScreen">
+    <h2 id="endingTitle">Il minerale più raro</h2>
+    <div id="endingPhotoWrap">
+      <img id="endingPhoto" alt="">
+      <span class="placeholderMark"><svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-10-9.3C.4 8.1 2 4.5 5.5 4c2-.3 3.9.7 5 2.3C11.6 4.7 13.5 3.7 15.5 4c3.5.5 5.1 4.1 3.5 7.7C21.5 16.4 12 21 12 21z"/></svg></span>
+    </div>
+    <p id="endingMessage"></p>
+    <canvas id="pixelHugCanvas" width="32" height="32" style="display:none; margin: 30px auto 10px; image-rendering: pixelated; width: 140px; height: 140px;"></canvas>
+    <button class="pixelBtn" id="replayBtn">RIGIOCA</button>
+  </div>
+
+  <div id="titleScreen">
+    <h1>LA PIETRA<br>PIÙ RARA</h1>
+    <p class="sub">Andrea scende nelle profondità della miniera, in cerca del minerale più raro che si conosca. Alcune cose, per essere trovate, vanno cercate al buio.</p>
+    <button class="pixelBtn" id="startBtn">INIZIA LA DISCESA</button>
+    <div class="credit">mouse per guardare · WASD per muoversi · click per scavare · E per interagire</div>
+  </div>
+
+  <!-- Controlli Mobile -->
+  <div id="mobileControls">
+    <div id="joystickContainer">
+      <div id="joystickKnob"></div>
+    </div>
+    <button id="mobileActionButton">SCAVA</button>
+  </div>
+
+  <!-- Overlay Orientamento Portrait -->
+  <div id="portraitOverlay">
+    <div class="message-box">
+      <div class="phone-icon">📱</div>
+      <h2>Ruota il dispositivo</h2>
+      <p>Per giocare, per favore ruota il tuo telefono in modalità orizzontale (landscape).</p>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+/* =========================================================================
+   RILEVAMENTO DISPOSITIVO MOBILE
+   ========================================================================= */
+const IS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+/* =========================================================================
+   CONFIG NARRATIVO — modifica qui nomi, testi e messaggio finale
+   ========================================================================= */
+const CONFIG = {
+  protagonist: "Andrea",
+  // Metti qui il percorso/URL della foto (o lasciala vuota per il segnaposto a cuore)
+  endingPhotoSrc: "foto2.jpg",
+  stages: ["INGRESSO","CARBONE","FERRO / REDSTONE","ORO","DIAMANTE"],
+  sequences: {
+    intro: {
+      lines: [
+        "La scala di corda scricchiola dietro di me mentre scendo.",
+        "L'aria qui sotto è più densa, più antica.",
+        "Da qualche parte, in questa montagna, si nasconde il minerale più raro che si conosca.",
+        "Non l'ho mai visto. Ma so che lo riconoscerò, quando lo troverò."
+      ]
+    },
+    evento1: {
+      lines: [
+        "Una pietra rotola da sola, da qualche parte sopra di me.",
+        "Mi fermo. Ascolto. Poi solo silenzio, e il suono della mia torcia che scoppietta.",
+        "Continuo a scendere."
+      ]
+    },
+    quest1_intro: {
+      lines: [
+        "Il tunnel si apre in una piccola camera.",
+        "Nella roccia brillano tre venature bianche. Ma solo una mi chiama davvero.",
+        "Per continuare devo trovare il cristallo giusto."
+      ]
+    },
+    quest1_wrong: { lines: ["Non è questo. Non sento nulla di speciale.", "Provo con un altro."] },
+    quest1_correct: { lines: ["Eccolo.", "Lo sento vibrare piano, come un battito. Questo è quello giusto."] },
+    fork_intro: {
+      lines: [
+        "Il tunnel si divide in due, davanti a me.",
+        "Uno dei due sentieri, lo sento, non porta da nessuna parte.",
+        "Scelgo con calma. Tanto, se sbaglio, posso sempre tornare indietro."
+      ]
+    },
+    fork_deadend: { lines: ["Qui non c'è il tesoro...", "Meglio tornare sui miei passi."] },
+    bridge_intro: {
+      lines: [
+        "Una voragine si apre nella roccia. Il vecchio ponte è crollato da tempo.",
+        "Vedo delle assi sparse tra le pietre, poco più in là. Potrebbero bastare per attraversare."
+      ]
+    },
+    bridge_complete: { lines: ["Il ponte regge.", "Attraverso, con cautela."] },
+    door_intro: {
+      lines: [
+        "Una porta antica mi sbarra il passaggio, incisa con tre simboli.",
+        "Li ho già visti, incisi nella roccia, lungo il cammino.",
+        "Provo a premerli."
+      ]
+    },
+    door_open: { lines: ["La pietra cede con un lungo respiro.", "Il passaggio è libero."] },
+    soglia: {
+      lines: [
+        "Una nuova camera si apre davanti a me, la più grande finora.",
+        "L'aria trema, come prima di un temporale.",
+        "E in fondo, qualcosa brilla di una luce che non ho mai visto prima."
+      ]
+    },
+    cristallo: {
+      lines: [
+        "Mi avvicino piano, quasi senza fiato.",
+        "Finalmente l'ho trovato...",
+        "Non è oro. Non è un diamante. È qualcosa di più raro: brilla di un bianco che assomiglia al calore.",
+        "Allungo il piccone. Devo colpirlo, per liberarlo dalla roccia."
+      ],
+      onEnd:"unlockFinal"
+    }
+  },
+  symbolNote: "Un simbolo, inciso nella roccia. Lo ricordo.",
+  // Messaggio finale — personalizzabile liberamente
+  finalMessage: "Le cose più rare del mondo non si trovano per caso: si cercano, con pazienza, nel buio, senza mai smettere di credere che valgano la fatica. Tu sei la pietra più rara che abbia mai trovato."
+};
+
+document.getElementById('dialogueName').textContent = CONFIG.protagonist.toUpperCase();
+
+/* =========================================================================
+   UTILITÀ
+   ========================================================================= */
+function hashNoise(a,b){
+  let n = Math.sin(a*12.9898 + b*78.233)*43758.5453;
+  return (n - Math.floor(n))*2-1;
+}
+function fbmNoise(a,b){
+  return hashNoise(a,b)*0.55 + hashNoise(a*2.13+11.1,b*2.13+7.7)*0.30 + hashNoise(a*4.7-3.3,b*4.7+2.2)*0.15;
+}
+function smoothstep(e0,e1,x){ x = Math.min(Math.max((x-e0)/(e1-e0),0),1); return x*x*(3-2*x); }
+function lerp(a,b,t){ return a+(b-a)*t; }
+function clamp(x,a,b){ return Math.min(Math.max(x,a),b); }
+
+function makeRadialTexture(inner, outer, size=64){
+  const c = document.createElement('canvas'); c.width=c.height=size;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(size/2,size/2,0,size/2,size/2,size/2);
+  g.addColorStop(0, inner); g.addColorStop(1, outer);
+  ctx.fillStyle = g; ctx.fillRect(0,0,size,size);
+  const tex = new THREE.CanvasTexture(c);
+  return tex;
+}
+
+/* maschera radiale in scala di grigi (per alphaMap: bianco=opaco, nero=trasparente) */
+function makeRadialMaskTexture(size=128){
+  const c = document.createElement('canvas'); c.width=c.height=size;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(size/2,size/2,size*0.06, size/2,size/2,size/2);
+  g.addColorStop(0,'rgb(255,255,255)');
+  g.addColorStop(0.76,'rgb(255,255,255)');
+  g.addColorStop(1,'rgb(0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(0,0,size,size);
+  return new THREE.CanvasTexture(c);
+}
+
+/* rumore a onde intere: perfettamente ripetibile (tileable) su u,v in [0,1) */
+function tileableNoise(u,v,seed=0){
+  const waves = [
+    [3,2, 0.31+seed, 0.71+seed, 0.42],
+    [5,7, 0.11+seed, 0.24+seed, 0.26],
+    [11,9,0.63+seed, 0.05+seed, 0.16],
+    [17,13,0.88+seed,0.42+seed, 0.10],
+    [29,23,0.15+seed,0.93+seed, 0.06]
+  ];
+  let sum=0, norm=0;
+  waves.forEach(([fx,fy,px,py,amp])=>{
+    sum += Math.sin((u*fx+px)*Math.PI*2) * Math.sin((v*fy+py)*Math.PI*2) * amp;
+    norm += amp;
+  });
+  return sum/norm; // circa -1..1
+}
+
+/* texture procedurali di roccia calda da grotta: colore (mottled) + rilievo */
+function makeRockTextures(size=768){
+  const colorCanvas = document.createElement('canvas'); colorCanvas.width=colorCanvas.height=size;
+  const normalCanvas = document.createElement('canvas'); normalCanvas.width=normalCanvas.height=size;
+  const roughCanvas = document.createElement('canvas'); roughCanvas.width=roughCanvas.height=size;
+  const cctx = colorCanvas.getContext('2d');
+  const nctx = normalCanvas.getContext('2d');
+  const rctx = roughCanvas.getContext('2d');
+  const cimg = cctx.createImageData(size,size);
+  const nimg = nctx.createImageData(size,size);
+  const rimg = rctx.createImageData(size,size);
+  const stops = [ [8,6,5], [18,14,10], [32,26,18], [48,38,28], [24,28,20], [42,36,30], [62,52,40] ];
+
+  const heightMap = new Float32Array(size*size);
+
+  for(let y=0;y<size;y++){
+    for(let x=0;x<size;x++){
+      const u=x/size, v=y/size;
+      const macro = tileableNoise(u,v,0)*0.5+0.5;
+      const mid   = tileableNoise(u*2.3+9,v*2.3+4,0.37)*0.5+0.5;
+      const fine  = tileableNoise(u*7.1+2,v*7.1+8,0.81)*0.5+0.5;
+      const vein = tileableNoise(u*4.5, v*15.0+macro*3.0, 0.15)*0.5+0.5;
+
+      let idxA = Math.min(Math.floor(macro*6), 5);
+      const tA = macro*6 - idxA;
+      const cA = stops[idxA], cB = stops[idxA+1];
+      let r = lerp(cA[0],cB[0],tA), g = lerp(cA[1],cB[1],tA), b = lerp(cA[2],cB[2],tA);
+
+      if(vein > 0.65){
+        const vT = smoothstep(0.65, 0.85, vein);
+        r = lerp(r, stops[6][0]*1.2, vT); g = lerp(g, stops[6][1]*1.2, vT); b = lerp(b, stops[6][2]*1.2, vT);
+      }
+      if(mid>0.72){
+        const mossT = smoothstep(0.72,0.95,mid);
+        r = lerp(r, stops[4][0], mossT*0.5); g = lerp(g, stops[4][1], mossT*0.5); b = lerp(b, stops[4][2], mossT*0.5);
+      }
+      const speck = (fine-0.5)*24;
+      r = Math.max(0,Math.min(255, r+speck)); g = Math.max(0,Math.min(255, g+speck)); b = Math.max(0,Math.min(255, b+speck));
+
+      const idx=(y*size+x);
+      cimg.data[idx*4]=r; cimg.data[idx*4+1]=g; cimg.data[idx*4+2]=b; cimg.data[idx*4+3]=255;
+
+      const bumpVal = ((mid-0.5)*0.8 + (fine-0.5)*0.7 + (vein-0.5)*0.6)*0.5+0.5;
+      heightMap[idx] = Math.max(0, Math.min(1, bumpVal));
+    }
+  }
+
+  // Seconda passata per Normal e Roughness
+  for(let y=0;y<size;y++){
+    for(let x=0;x<size;x++){
+      const idx = y*size+x;
+      const h0 = heightMap[idx];
+      const hX = heightMap[y*size + ((x+1)%size)];
+      const hY = heightMap[((y+1)%size)*size + x];
+
+      let dX = (h0 - hX) * 12.0;
+      let dY = (h0 - hY) * 12.0;
+
+      const len = Math.hypot(dX, dY, 1.0);
+      const nx = -dX / len;
+      const ny = -dY / len;
+      const nz = 1.0 / len;
+
+      nimg.data[idx*4] = Math.floor((nx * 0.5 + 0.5) * 255);
+      nimg.data[idx*4+1] = Math.floor((ny * 0.5 + 0.5) * 255);
+      nimg.data[idx*4+2] = Math.floor((nz * 0.5 + 0.5) * 255);
+      nimg.data[idx*4+3] = 255;
+
+      // Crepe (basso h0) molto umide/riflettenti. Roccia esposta ruvida.
+      const roughVal = lerp(0.1, 0.85, h0);
+      const rv = Math.floor(roughVal * 255);
+      rimg.data[idx*4]=rv; rimg.data[idx*4+1]=rv; rimg.data[idx*4+2]=rv; rimg.data[idx*4+3]=255;
+    }
+  }
+
+  cctx.putImageData(cimg,0,0);
+  nctx.putImageData(nimg,0,0);
+  rctx.putImageData(rimg,0,0);
+
+  const colorTex = new THREE.CanvasTexture(colorCanvas);
+  colorTex.wrapS = colorTex.wrapT = THREE.RepeatWrapping;
+  colorTex.colorSpace = THREE.SRGBColorSpace;
+  
+  const normalTex = new THREE.CanvasTexture(normalCanvas);
+  normalTex.wrapS = normalTex.wrapT = THREE.RepeatWrapping;
+
+  const roughTex = new THREE.CanvasTexture(roughCanvas);
+  roughTex.wrapS = roughTex.wrapT = THREE.RepeatWrapping;
+
+  return { colorTex, normalTex, roughTex };
+}
+
+/* texture procedurali per la corteccia dei tronchi */
+function makeBarkTextures(size=256){
+  const colorCanvas = document.createElement('canvas'); colorCanvas.width=colorCanvas.height=size;
+  const normalCanvas = document.createElement('canvas'); normalCanvas.width=normalCanvas.height=size;
+  const cctx = colorCanvas.getContext('2d');
+  const nctx = normalCanvas.getContext('2d');
+  const cimg = cctx.createImageData(size,size);
+  const nimg = nctx.createImageData(size,size);
+  const heightMap = new Float32Array(size*size);
+
+  for(let y=0;y<size;y++){
+    for(let x=0;x<size;x++){
+      // La corteccia ha fibre verticali
+      const u=x/size, v=y/size;
+      const n1 = tileableNoise(u*15.0, v*2.0, 0.1)*0.5+0.5;
+      const n2 = tileableNoise(u*30.0, v*4.0, 0.8)*0.5+0.5;
+      
+      const val = n1*0.7 + n2*0.3;
+      heightMap[y*size+x] = val;
+
+      const r = lerp(20, 45, val);
+      const g = lerp(16, 38, val);
+      const b = lerp(12, 28, val);
+
+      const idx=(y*size+x)*4;
+      cimg.data[idx]=r; cimg.data[idx+1]=g; cimg.data[idx+2]=b; cimg.data[idx+3]=255;
+    }
+  }
+
+  for(let y=0;y<size;y++){
+    for(let x=0;x<size;x++){
+      const idx = y*size+x;
+      const h0 = heightMap[idx];
+      const hX = heightMap[y*size + ((x+1)%size)];
+      const hY = heightMap[((y+1)%size)*size + x];
+
+      let dX = (h0 - hX) * 15.0;
+      let dY = (h0 - hY) * 15.0;
+
+      const len = Math.hypot(dX, dY, 1.0);
+      const nx = -dX / len;
+      const ny = -dY / len;
+      const nz = 1.0 / len;
+
+      nimg.data[idx*4] = Math.floor((nx * 0.5 + 0.5) * 255);
+      nimg.data[idx*4+1] = Math.floor((ny * 0.5 + 0.5) * 255);
+      nimg.data[idx*4+2] = Math.floor((nz * 0.5 + 0.5) * 255);
+      nimg.data[idx*4+3] = 255;
+    }
+  }
+
+  cctx.putImageData(cimg,0,0);
+  nctx.putImageData(nimg,0,0);
+
+  const colorTex = new THREE.CanvasTexture(colorCanvas);
+  colorTex.wrapS = colorTex.wrapT = THREE.RepeatWrapping;
+  colorTex.colorSpace = THREE.SRGBColorSpace;
+  
+  const normalTex = new THREE.CanvasTexture(normalCanvas);
+  normalTex.wrapS = normalTex.wrapT = THREE.RepeatWrapping;
+
+  return { colorTex, normalTex };
+}
+
+/* fiamma di torcia più organica (nucleo caldo + punta) */
+function makeFlameTexture(size=128){
+  const c = document.createElement('canvas'); c.width=c.height=size;
+  const ctx = c.getContext('2d');
+  const g1 = ctx.createRadialGradient(size*0.5,size*0.64,0, size*0.5,size*0.64,size*0.5);
+  g1.addColorStop(0,'rgba(255,247,214,1)');
+  g1.addColorStop(0.35,'rgba(255,206,120,0.95)');
+  g1.addColorStop(0.7,'rgba(255,120,40,0.5)');
+  g1.addColorStop(1,'rgba(255,80,20,0)');
+  ctx.fillStyle=g1; ctx.fillRect(0,0,size,size);
+  const g2 = ctx.createRadialGradient(size*0.5,size*0.28,0, size*0.5,size*0.28,size*0.3);
+  g2.addColorStop(0,'rgba(255,236,190,0.9)');
+  g2.addColorStop(1,'rgba(255,236,190,0)');
+  ctx.fillStyle=g2; ctx.fillRect(0,0,size,size);
+  return new THREE.CanvasTexture(c);
+}
+
+/* venatura di legno per le aste delle torce */
+function makeWoodTexture(size=128){
+  const c = document.createElement('canvas'); c.width=c.height=size;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#26190f'; ctx.fillRect(0,0,size,size);
+  for(let i=0;i<24;i++){
+    const x = (i/24)*size + (Math.random()-0.5)*4;
+    ctx.strokeStyle = `rgba(120,90,58,${0.2+Math.random()*0.3})`;
+    ctx.lineWidth = 1+Math.random()*2.2;
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x+(Math.random()-0.5)*10, size); ctx.stroke();
+  }
+  return new THREE.CanvasTexture(c);
+}
+
+/* texture incrinatura (per il cristallo finale, si intensifica ad ogni colpo) */
+function makeCrackTexture(size=256){
+  const c = document.createElement('canvas'); c.width=c.height=size;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,size,size);
+  ctx.strokeStyle = 'rgba(20,26,34,0.9)';
+  ctx.lineCap='round';
+  function branch(x,y,ang,len,depth){
+    if(depth<=0 || len<3) return;
+    const x2 = x+Math.cos(ang)*len, y2 = y+Math.sin(ang)*len;
+    ctx.lineWidth = Math.max(0.6, depth*0.9);
+    ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x2,y2); ctx.stroke();
+    const branches = 1+Math.floor(Math.random()*2);
+    for(let i=0;i<branches;i++){
+      branch(x2,y2, ang + (Math.random()-0.5)*1.4, len*(0.55+Math.random()*0.25), depth-1);
+    }
+  }
+  const cx=size/2, cy=size/2;
+  for(let i=0;i<6;i++){
+    branch(cx,cy, (i/6)*Math.PI*2 + Math.random()*0.4, size*0.28, 5);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  return tex;
+}
+
+/* simboli incisi: 0=triangolo, 1=cerchio, 2=quadrato */
+function makeSymbolTexture(kind, size=128){
+  const c = document.createElement('canvas'); c.width=c.height=size;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,size,size);
+  ctx.strokeStyle = 'rgba(255,244,225,0.95)';
+  ctx.lineWidth = size*0.07;
+  ctx.lineJoin='round'; ctx.lineCap='round';
+  const cx=size/2, cy=size/2, r=size*0.32;
+  ctx.beginPath();
+  if(kind===0){
+    for(let i=0;i<3;i++){
+      const a = -Math.PI/2 + i*(Math.PI*2/3);
+      const x = cx+Math.cos(a)*r, y = cy+Math.sin(a)*r;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.closePath();
+  } else if(kind===1){
+    ctx.arc(cx,cy,r,0,Math.PI*2);
+  } else {
+    ctx.rect(cx-r*0.82,cy-r*0.82,r*1.64,r*1.64);
+  }
+  ctx.stroke();
+  return new THREE.CanvasTexture(c);
+}
+const SYMBOL_TEX = [makeSymbolTexture(0), makeSymbolTexture(1), makeSymbolTexture(2)];
+function symbolSVG(kind){
+  if(kind===0) return '<svg viewBox="0 0 24 24"><path d="M12 3 L21 20 L3 20 Z" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+  if(kind===1) return '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+  return '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+}
+
+/* texture cristallina procedurale per i geodi */
+function makeCrystalTexture(size=256){
+  const c = document.createElement('canvas'); c.width=c.height=size;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#88bbff'; ctx.fillRect(0,0,size,size);
+  ctx.globalCompositeOperation = 'overlay';
+  for(let i=0; i<40; i++){
+    ctx.strokeStyle = Math.random()>0.5 ? 'rgba(255,255,255,0.8)' : 'rgba(0,40,100,0.6)';
+    ctx.lineWidth = 1 + Math.random()*5;
+    ctx.beginPath();
+    let x = Math.random()*size, y = Math.random()*size;
+    ctx.moveTo(x,y);
+    for(let j=0; j<4; j++){
+      x += (Math.random()-0.5)*size*0.4;
+      y += (Math.random()-0.5)*size*0.4;
+      ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  const tex = new THREE.CanvasTexture(c);
+  return tex;
+}
+
+/* texture per le foglie dei rampicanti (con alpha) */
+function makeCreepersTexture(size=256){
+  const c = document.createElement('canvas'); c.width=c.height=size;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,size,size);
+  ctx.lineCap = 'round';
+  for(let i=0; i<15; i++){
+    ctx.strokeStyle = '#0e2411';
+    ctx.lineWidth = 2 + Math.random()*3;
+    ctx.beginPath();
+    let x = Math.random()*size, y = 0;
+    ctx.moveTo(x,y);
+    for(let j=0; j<8; j++){
+      x += (Math.random()-0.5)*40; y += size/8; ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+  for(let i=0; i<150; i++){
+    const x = Math.random()*size, y = Math.random()*size;
+    const leafSize = 5 + Math.random()*10;
+    ctx.fillStyle = (Math.random()>0.5) ? '#18421f' : '#225e2c';
+    ctx.beginPath();
+    ctx.ellipse(x, y, leafSize, leafSize*0.4, Math.random()*Math.PI, 0, Math.PI*2);
+    ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+/* texture cappello fungo */
+function makeShroomTexture(size=128){
+  const c = document.createElement('canvas'); c.width=c.height=size;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(size/2,size/2,0, size/2,size/2,size/2);
+  g.addColorStop(0, '#00ffaa'); g.addColorStop(1, '#005533');
+  ctx.fillStyle = g; ctx.fillRect(0,0,size,size);
+  for(let i=0; i<15; i++){
+    ctx.fillStyle = '#ccffff';
+    ctx.beginPath();
+    ctx.arc(Math.random()*size, Math.random()*size, 2+Math.random()*5, 0, Math.PI*2);
+    ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  return tex;
+}
+
+/* =========================================================================
+   SCENA BASE
+   ========================================================================= */
+const app = document.getElementById('app');
+const scene = new THREE.Scene();
+const FOG_COLOR = 0x030201;
+scene.background = new THREE.Color(FOG_COLOR);
+scene.fog = new THREE.FogExp2(FOG_COLOR, 0.068);
+
+const camera = new THREE.PerspectiveCamera(72, window.innerWidth/window.innerHeight, 0.05, 120);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:"high-performance" });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.92;
+app.appendChild(renderer.domElement);
+
+const composer = new THREE.EffectComposer(renderer);
+const renderPass = new THREE.RenderPass(scene, camera);
+composer.addPass(renderPass);
+
+const bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+bloomPass.threshold = 0.65;
+bloomPass.strength = 1.35;
+bloomPass.radius = 0.7;
+composer.addPass(bloomPass);
+
+scene.add(new THREE.HemisphereLight(0x1a1612, 0x030201, 0.10));
+
+const { colorTex: rockColorTex, normalTex: rockNormalTex, roughTex: rockRoughTex } = makeRockTextures(768);
+const glowTex = makeRadialTexture('rgba(255,255,255,0.95)','rgba(255,255,255,0)');
+const flameTex = makeFlameTexture();
+const woodTex = makeWoodTexture();
+woodTex.wrapS = THREE.RepeatWrapping; woodTex.repeat.set(1,2);
+const crackTex = makeCrackTexture();
+
+/* =========================================================================
+   SISTEMA DI PERCORSO GENERICO — usato per il tunnel principale e per la
+   diramazione del bivio. Ogni "path" è un tubo continuo e deformato,
+   mai una sequenza di stanze scollegate.
+   ========================================================================= */
+function makePath(waypoints){
+  const curve = new THREE.CatmullRomCurve3(
+    waypoints.map(w=>new THREE.Vector3(w.p[0],w.p[1],w.p[2])), false, 'catmullrom', 0.35
+  );
+  const n = waypoints.length;
+  function baseRadiusAt(t){
+    const seg = t*(n-1);
+    const i0 = Math.min(Math.floor(seg), n-2);
+    const i1 = i0+1;
+    const s = smoothstep(0,1, seg-i0);
+    return lerp(waypoints[i0].r, waypoints[i1].r, s);
+  }
+  function frameAt(t){
+    const center = curve.getPointAt(clamp(t,0,1));
+    const tangent = curve.getTangentAt(clamp(t,0,1)).normalize();
+    const worldUp = new THREE.Vector3(0,1,0);
+    let normal = new THREE.Vector3().crossVectors(worldUp, tangent);
+    if(normal.lengthSq() < 1e-6) normal = new THREE.Vector3(1,0,0);
+    normal.normalize();
+    const binormal = new THREE.Vector3().crossVectors(tangent, normal).normalize();
+    return { center, tangent, normal, binormal };
+  }
+  function surfacePoint(t, theta, radiusScale=1){
+    const f = frameAt(t);
+    const r = baseRadiusAt(t)*radiusScale;
+    return f.center.clone()
+      .add(f.normal.clone().multiplyScalar(Math.cos(theta)*r))
+      .add(f.binormal.clone().multiplyScalar(Math.sin(theta)*r));
+  }
+  const sampleCount = Math.max(80, Math.round(curve.getLength()*3));
+  const sampleTs = [], samplePts = [];
+  for(let i=0;i<=sampleCount;i++){
+    const t = i/sampleCount;
+    sampleTs.push(t);
+    samplePts.push(curve.getPointAt(t));
+  }
+  function nearestSample(pos){
+    let best=0, bestD=Infinity;
+    for(let i=0;i<=sampleCount;i++){
+      const d = samplePts[i].distanceToSquared(pos);
+      if(d<bestD){ bestD=d; best=i; }
+    }
+    return { t: sampleTs[best], distSq: bestD };
+  }
+  return { waypoints, curve, baseRadiusAt, frameAt, surfacePoint, sampleTs, samplePts, nearestSample, length: curve.getLength() };
+}
+
+/* costruisce la mesh continua del tubo-grotta per un dato path */
+function buildCaveTube(path, opts={}){
+  const PATH_SEGMENTS = opts.segments || Math.max(60, Math.round(path.length*3.5));
+  const RADIAL_SEGMENTS = 24;
+  const positions = [], colors = [], uvs = [];
+  const UV_REPEAT_U = 5, UV_TILE_LEN = 2.4;
+  const rockDeep = new THREE.Color(0x1c150e);
+  const rockDamp = new THREE.Color(0x141a12);
+  const rockWarm = new THREE.Color(0x43301c);
+  const seedOff = opts.noiseSeed || 0;
+
+  for(let i=0;i<=PATH_SEGMENTS;i++){
+    const t = i/PATH_SEGMENTS;
+    const f = path.frameAt(t);
+    const R = path.baseRadiusAt(t);
+    const ovality = Math.sin(t*12.0+seedOff)*0.2; // Ovality that varies
+
+    for(let j=0;j<RADIAL_SEGMENTS;j++){
+      const theta = (j/RADIAL_SEGMENTS)*Math.PI*2;
+      const vertical = Math.sin(theta);
+      const horizontal = Math.cos(theta);
+      
+      const macro = fbmNoise(t*3.0+seedOff, theta*1.5+seedOff);
+      const meso  = fbmNoise(t*8.0+seedOff, theta*3.0+seedOff);
+      const micro = fbmNoise(t*18.0+seedOff, theta*6.0+seedOff);
+
+      let radial = R * (1.0 + (horizontal > 0 ? ovality : -ovality));
+      
+      if(vertical < -0.3){ 
+        radial *= 0.7; 
+        radial += meso*0.1*R + micro*0.05*R;
+      }
+      else if(vertical > 0.25){ 
+        radial += macro*0.45*R + meso*0.3*R + micro*0.08*R;
+      }
+      else { 
+        radial += macro*0.3*R + meso*0.2*R + micro*0.08*R; 
+      }
+      radial = Math.max(radial, R*0.4);
+
+      const pos = f.center.clone()
+        .add(f.normal.clone().multiplyScalar(horizontal*radial))
+        .add(f.binormal.clone().multiplyScalar(vertical*radial));
+      positions.push(pos.x,pos.y,pos.z);
+      uvs.push((j/RADIAL_SEGMENTS)*UV_REPEAT_U, (t*path.length)/UV_TILE_LEN);
+
+      let col = rockDeep.clone();
+      if(vertical < -0.35) col = rockDeep.clone().lerp(rockDamp, 0.6).multiplyScalar(0.85);
+      else if(meso > 0.2) col = rockDeep.clone().lerp(rockWarm, 0.5);
+      
+      const shade = 0.85 + meso*0.25;
+      col.multiplyScalar(shade);
+      col.multiplyScalar(1.0 - t*0.35);
+      colors.push(col.r,col.g,col.b);
+    }
+  }
+  const indices = [];
+  for(let i=0;i<PATH_SEGMENTS;i++){
+    for(let j=0;j<RADIAL_SEGMENTS;j++){
+      const a = i*RADIAL_SEGMENTS+j;
+      const b = i*RADIAL_SEGMENTS+((j+1)%RADIAL_SEGMENTS);
+      const c = (i+1)*RADIAL_SEGMENTS+j;
+      const d = (i+1)*RADIAL_SEGMENTS+((j+1)%RADIAL_SEGMENTS);
+      indices.push(a,c,b, b,c,d);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions,3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors,3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs,2));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  const mat = new THREE.MeshStandardMaterial({
+    vertexColors:true, map:rockColorTex, normalMap:rockNormalTex, normalScale:new THREE.Vector2(1.5,1.5),
+    roughness:0.95, metalness:0.03, side:THREE.DoubleSide, fog:true
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  return mesh;
+}
+
+/* =========================================================================
+   PERCORSO PRINCIPALE (spina dorsale continua, 11 punti di controllo)
+   Ogni "camera" richiesta dal design (cristallo, bivio, ponte, porta,
+   camera finale) è semplicemente una variazione di raggio lungo lo
+   STESSO tubo continuo — nessuna stanza scollegata, nessun blocco
+   piazzato a caso.
+   ========================================================================= */
+const MAIN_WAYPOINTS = [
+  { p:[0,    1.6,   0],   r:3.0 },  // 0  ingresso
+  { p:[2.6,  1.15, -9],   r:1.9 },  // 1  restringimento (evento1)
+  { p:[7.0,  0.75, -18],  r:2.7 },  // 2  camera del cristallo (quest 1)
+  { p:[5.2,  0.35, -27],  r:1.8 },  // 3  narrowing dopo il cristallo
+  { p:[-0.8,-0.05, -35],  r:2.1 },  // 4  bivio (quest 2)
+  { p:[-6.4,-0.55, -44],  r:1.9 },  // 5  passaggio profondo
+  { p:[-3.2,-1.05, -53],  r:3.6 },  // 6  voragine del ponte (quest 3)
+  { p:[1.8, -1.45, -62],  r:1.75},  // 7  passaggio stretto (zona oro)
+  { p:[6.0, -1.75, -70],  r:2.2 },  // 8  soglia della porta (quest 4)
+  { p:[3.0, -2.05, -79],  r:2.0 },  // 9  oltre la porta
+  { p:[0,   -2.4,  -90],  r:6.8 }   // 10 camera finale (quest 5)
+];
+const mainPath = makePath(MAIN_WAYPOINTS);
+const caveMesh = buildCaveTube(mainPath, { noiseSeed:0 });
+scene.add(caveMesh);
+
+// Pavimento della grotta (striscia di roccia piatta)
+{
+  const FLOOR_STEPS = 80;
+  const floorVerts = [];
+  const floorUVs = [];
+  const floorIdx = [];
+  for(let i=0; i<=FLOOR_STEPS; i++){
+    const t = i/FLOOR_STEPS;
+    const f = mainPath.frameAt(t);
+    const R = mainPath.baseRadiusAt(t);
+    const floorY = f.center.y - R*0.36;
+    const hw = Math.min(R*0.7, 2.5);
+    const L = new THREE.Vector3(f.center.x - hw, floorY, f.center.z);
+    const Ri2 = new THREE.Vector3(f.center.x + hw, floorY, f.center.z);
+    floorVerts.push(L.x, L.y, L.z, Ri2.x, Ri2.y, Ri2.z);
+    const uv = t * 8;
+    floorUVs.push(0, uv, 1, uv);
+    if(i < FLOOR_STEPS){
+      const a = i*2, b = i*2+1, c = i*2+2, d = i*2+3;
+      floorIdx.push(a,c,b, b,c,d);
+    }
+  }
+  const floorGeo = new THREE.BufferGeometry();
+  floorGeo.setAttribute('position', new THREE.Float32BufferAttribute(floorVerts,3));
+  floorGeo.setAttribute('uv', new THREE.Float32BufferAttribute(floorUVs,2));
+  floorGeo.setIndex(floorIdx);
+  floorGeo.computeVertexNormals();
+  const floorRockTex = rockColorTex.clone(); floorRockTex.needsUpdate=true; floorRockTex.repeat.set(2,1);
+  const floorNormTex = rockNormalTex.clone(); floorNormTex.needsUpdate=true; floorNormTex.repeat.set(2,1);
+  const floorMat = new THREE.MeshStandardMaterial({
+    map: floorRockTex, normalMap: floorNormTex,
+    normalScale: new THREE.Vector2(1.2,1.2),
+    roughness:0.98, metalness:0.01, fog:true
+  });
+  scene.add(new THREE.Mesh(floorGeo, floorMat));
+}
+
+/* =========================================================================
+   AMBIENTE ESTERNO (FORESTA)
+   ========================================================================= */
+function getOutdoorElevation(x, z) {
+  // Duna che sale dolcemente allontanandosi dalla grotta (Z=0)
+  let dune = 0;
+  if (z > 0) {
+    dune = Math.pow(z / 50, 1.5) * 3.5;
+  }
+  return 0.5 + dune;
+}
+
+function buildOutdoor(){
+  const outdoorGroup = new THREE.Group();
+  
+  // ── Texture procedurale del terreno (terra/fango) ──
+  const gtSize = 512;
+  const gtCanvas = document.createElement('canvas'); gtCanvas.width=gtCanvas.height=gtSize;
+  const gnCanvas = document.createElement('canvas'); gnCanvas.width=gnCanvas.height=gtSize;
+  const grCanvas = document.createElement('canvas'); grCanvas.width=grCanvas.height=gtSize;
+  const gtCtx = gtCanvas.getContext('2d');
+  const gnCtx = gnCanvas.getContext('2d');
+  const grCtx = grCanvas.getContext('2d');
+  const gtImg = gtCtx.createImageData(gtSize,gtSize);
+  const gnImg = gnCtx.createImageData(gtSize,gtSize);
+  const grImg = grCtx.createImageData(gtSize,gtSize);
+  const gHeightMap = new Float32Array(gtSize*gtSize);
+
+  for(let y=0;y<gtSize;y++){
+    for(let x=0;x<gtSize;x++){
+      const u=x/gtSize, vv=y/gtSize;
+      const n1 = tileableNoise(u*6,vv*6,0.3)*0.5+0.5;
+      const n2 = tileableNoise(u*14,vv*14,0.7)*0.5+0.5;
+      const n3 = tileableNoise(u*30,vv*30,0.9)*0.5+0.5;
+      const val = n1*0.5 + n2*0.35 + n3*0.15;
+      gHeightMap[y*gtSize+x] = val;
+
+      const r = lerp(8, 20, val);
+      const g = lerp(28, 48, val);
+      const b = lerp(8, 16, val);
+      const idx=(y*gtSize+x)*4;
+      gtImg.data[idx]=r; gtImg.data[idx+1]=g; gtImg.data[idx+2]=b; gtImg.data[idx+3]=255;
+      
+      const rough = Math.floor(lerp(200, 255, val));
+      grImg.data[idx]=rough; grImg.data[idx+1]=rough; grImg.data[idx+2]=rough; grImg.data[idx+3]=255;
+    }
+  }
+
+  for(let y=0;y<gtSize;y++){
+    for(let x=0;x<gtSize;x++){
+      const idx = y*gtSize+x;
+      const h0 = gHeightMap[idx];
+      const hX = gHeightMap[y*gtSize + ((x+1)%gtSize)];
+      const hY = gHeightMap[((y+1)%gtSize)*gtSize + x];
+
+      let dX = (h0 - hX) * 20.0;
+      let dY = (h0 - hY) * 20.0;
+
+      const len = Math.hypot(dX, dY, 1.0);
+      const nx = -dX / len;
+      const ny = -dY / len;
+      const nz = 1.0 / len;
+
+      gnImg.data[idx*4] = Math.floor((nx * 0.5 + 0.5) * 255);
+      gnImg.data[idx*4+1] = Math.floor((ny * 0.5 + 0.5) * 255);
+      gnImg.data[idx*4+2] = Math.floor((nz * 0.5 + 0.5) * 255);
+      gnImg.data[idx*4+3] = 255;
+    }
+  }
+
+  gtCtx.putImageData(gtImg,0,0);
+  gnCtx.putImageData(gnImg,0,0);
+  grCtx.putImageData(grImg,0,0);
+
+  const groundTex = new THREE.CanvasTexture(gtCanvas);
+  groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping;
+  groundTex.repeat.set(8,6);
+  groundTex.colorSpace = THREE.SRGBColorSpace;
+
+  const groundNormTex = new THREE.CanvasTexture(gnCanvas);
+  groundNormTex.wrapS = groundNormTex.wrapT = THREE.RepeatWrapping;
+  groundNormTex.repeat.set(8,6);
+
+  const groundRoughTex = new THREE.CanvasTexture(grCanvas);
+  groundRoughTex.wrapS = groundRoughTex.wrapT = THREE.RepeatWrapping;
+  groundRoughTex.repeat.set(8,6);
+
+  // ── Terreno (arriva fino a Z=-2, sovrapponendosi al pavimento della grotta) ──
+  const groundGeo = new THREE.PlaneGeometry(80, 56, 64, 64);
+  const groundMat = new THREE.MeshStandardMaterial({
+    map: groundTex, 
+    normalMap: groundNormTex, 
+    roughnessMap: groundRoughTex,
+    normalScale: new THREE.Vector2(2.5, 2.5),
+    flatShading: true,
+    vertexColors: true
+  });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI/2;
+  ground.position.set(0, 0.5, 26);
+  const gv = groundGeo.attributes.position.array;
+  const vertCount = gv.length / 3;
+  const gColors = new Float32Array(vertCount * 3);
+  for(let i=0; i<gv.length; i+=3){
+    const vz = 26 - gv[i+1]; // world Z
+    gv[i+2] = getOutdoorElevation(0, vz) - 0.5 + (Math.random()-0.5)*0.5;
+    // Sfumatura: da verde (lontano) a marrone roccia (vicino alla grotta, Z<10)
+    const blend = 1.0 - smoothstep(0, 12, vz); // 1 vicino alla grotta, 0 lontano
+    const vi = (i/3) * 3;
+    // Verde muschio base → marrone roccia scuro
+    gColors[vi]   = lerp(1.0, 0.45, blend); // R
+    gColors[vi+1] = lerp(1.0, 0.35, blend); // G
+    gColors[vi+2] = lerp(1.0, 0.30, blend); // B
+  }
+  groundGeo.setAttribute('color', new THREE.BufferAttribute(gColors, 3));
+  groundGeo.computeVertexNormals();
+  outdoorGroup.add(ground);
+
+  // Generatore Texture Corteccia
+  const { colorTex: barkColorTex, normalTex: barkNormalTex } = makeBarkTextures(256);
+
+  // ── Erba 3D (fili piatti e curvi) ──
+  const GRASS_COUNT = 30000;
+  const grassGeo = new THREE.PlaneGeometry(0.06, 0.55, 1, 3);
+  const gverts = grassGeo.attributes.position.array;
+  for(let gi=0; gi<gverts.length; gi+=3){
+    const yNorm = (gverts[gi+1] + 0.275) / 0.55;
+    gverts[gi+2] += yNorm * yNorm * 0.12;
+    gverts[gi] *= (1.0 - yNorm*0.6);
+  }
+  grassGeo.translate(0, 0.275, 0);
+  grassGeo.computeVertexNormals();
+
+  const grassMat = new THREE.MeshStandardMaterial({
+    roughness: 0.85, side: THREE.DoubleSide, vertexColors: false
+  });
+  const grassInst = new THREE.InstancedMesh(grassGeo, grassMat, GRASS_COUNT);
+  const dummy = new THREE.Object3D();
+  const grassColors = [
+    new THREE.Color(0x0b2e10),
+    new THREE.Color(0x0e3812),
+    new THREE.Color(0x163510),
+    new THREE.Color(0x1c3210),
+    new THREE.Color(0x0a1f0a),
+    new THREE.Color(0x1a2a0c),
+    new THREE.Color(0x122818),
+    new THREE.Color(0x0e2a22),
+  ];
+  const moonTint = new THREE.Color(0x334455);
+  let placed = 0;
+  for(let i=0; i<GRASS_COUNT*2 && placed<GRASS_COUNT; i++){
+    const gx = (Math.random()-0.5)*70;
+    const gz = 4 + Math.random()*45;
+    const distFromPath = Math.abs(gx);
+    if(distFromPath < 3.5 && gz < 20){
+      if(Math.random() > smoothstep(0.5, 3.5, distFromPath)) continue;
+    }
+    if(gz < 8){
+      if(Math.random() > smoothstep(3.5, 8, gz)) continue;
+    }
+    dummy.position.set(gx, getOutdoorElevation(gx, gz), gz);
+    dummy.rotation.set((Math.random()-0.5)*0.35, Math.random()*Math.PI*2, (Math.random()-0.5)*0.35);
+    const sx = 0.6 + Math.random()*0.8;
+    const sy = 0.5 + Math.random()*1.5;
+    dummy.scale.set(sx, sy, sx);
+    dummy.updateMatrix();
+    grassInst.setMatrixAt(placed, dummy.matrix);
+    const col = grassColors[Math.floor(Math.random()*grassColors.length)].clone();
+    if(Math.random() < 0.15) col.lerp(moonTint, 0.25);
+    grassInst.setColorAt(placed, col);
+    placed++;
+  }
+  grassInst.instanceColor.needsUpdate = true;
+  grassInst.material.vertexColors = true;
+  grassInst.count = placed;
+  outdoorGroup.add(grassInst);
+
+  // ── Sottobosco: Cespugli ──
+  const bushMat = new THREE.MeshStandardMaterial({color: 0x071a09, roughness: 0.9, flatShading: true});
+  for(let i=0; i<25; i++){
+    const bx = (Math.random()-0.5)*35;
+    const bz = 5 + Math.random()*30;
+    if(Math.abs(bx) < 3.5) continue;
+    const bushGroup = new THREE.Group();
+    const spheres = 2 + Math.floor(Math.random()*3);
+    for(let s=0; s<spheres; s++){
+      const bs = 0.3 + Math.random()*0.5;
+      const bGeo = new THREE.IcosahedronGeometry(bs, 1);
+      const bvv = bGeo.attributes.position.array;
+      for(let j=0;j<bvv.length;j+=3){bvv[j]+=(Math.random()-0.5)*0.15;bvv[j+1]+=(Math.random()-0.5)*0.1;bvv[j+2]+=(Math.random()-0.5)*0.15;}
+      bGeo.computeVertexNormals();
+      const bMesh = new THREE.Mesh(bGeo, bushMat);
+      bMesh.position.set((Math.random()-0.5)*0.6, bs*0.6, (Math.random()-0.5)*0.6);
+      bushGroup.add(bMesh);
+    }
+    bushGroup.position.set(bx, getOutdoorElevation(bx, bz), bz);
+    outdoorGroup.add(bushGroup);
+  }
+
+  // ── Sottobosco: Felci (piani incrociati a X) ──
+  const fernMat = new THREE.MeshStandardMaterial({color: 0x0c2a0e, roughness: 0.8, side: THREE.DoubleSide, transparent: true, opacity: 0.9});
+  for(let i=0; i<40; i++){
+    const fx = (Math.random()-0.5)*40;
+    const fz = 5 + Math.random()*35;
+    if(Math.abs(fx) < 2.5) continue;
+    const fs = 0.4 + Math.random()*0.6;
+    const fernGeo = new THREE.PlaneGeometry(fs, fs*1.5);
+    const f1 = new THREE.Mesh(fernGeo, fernMat);
+    const f2 = new THREE.Mesh(fernGeo, fernMat);
+    const ey = getOutdoorElevation(fx, fz);
+    f1.position.set(fx, ey + fs*0.7, fz);
+    f2.position.set(fx, ey + fs*0.7, fz);
+    f1.rotation.y = Math.random()*Math.PI;
+    f2.rotation.y = f1.rotation.y + Math.PI/2;
+    outdoorGroup.add(f1); outdoorGroup.add(f2);
+  }
+
+  // ── Sottobosco: Sassolini sparsi ──
+  const pebbleMat = new THREE.MeshStandardMaterial({color: 0x1a1612, roughness: 1.0});
+  for(let i=0; i<60; i++){
+    const px = (Math.random()-0.5)*30;
+    const pz = 3 + Math.random()*25;
+    const ps = 0.05 + Math.random()*0.15;
+    const pebble = new THREE.Mesh(new THREE.IcosahedronGeometry(ps, 0), pebbleMat);
+    pebble.position.set(px, getOutdoorElevation(px, pz), pz);
+    pebble.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3);
+    outdoorGroup.add(pebble);
+  }
+
+  // ── Sottobosco: Funghi ──
+  const mushCapMat = new THREE.MeshStandardMaterial({color: 0x2a1810, roughness: 0.7});
+  const mushStemMat = new THREE.MeshStandardMaterial({color: 0x2a2820, roughness: 0.9});
+  for(let i=0; i<20; i++){
+    const mx = (Math.random()-0.5)*30;
+    const mz = 6 + Math.random()*28;
+    if(Math.abs(mx) < 3) continue;
+    const mGroup = new THREE.Group();
+    const stemH = 0.08 + Math.random()*0.1;
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.025, stemH, 5), mushStemMat);
+    stem.position.y = stemH/2;
+    const capR = 0.04 + Math.random()*0.06;
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(capR, 6, 4, 0, Math.PI*2, 0, Math.PI/2), mushCapMat);
+    cap.position.y = stemH;
+    mGroup.add(stem); mGroup.add(cap);
+    mGroup.position.set(mx, getOutdoorElevation(mx, mz), mz);
+    outdoorGroup.add(mGroup);
+  }
+
+  // ── Rocce giganti ad arco ──
+  const archMat = new THREE.MeshStandardMaterial({ color:0x1e1810, roughness:1.0 });
+  for(let i=0; i<20; i++){
+    const theta = (i/19)*Math.PI;
+    const r = 3.6 + Math.random()*0.5;
+    const s = 1.8 + Math.random();
+    const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(s,2), archMat);
+    const rv = rock.geometry.attributes.position.array;
+    for(let j=0;j<rv.length;j+=3){ rv[j]+=(Math.random()-0.5)*0.4; rv[j+1]+=(Math.random()-0.5)*0.4; rv[j+2]+=(Math.random()-0.5)*0.4; }
+    rock.geometry.computeVertexNormals();
+    rock.position.set(Math.cos(theta)*r, Math.sin(theta)*r + 0.52, 1.0 + Math.random());
+    rock.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3);
+    outdoorGroup.add(rock);
+  }
+
+  // ── Alberi Fotorealistici (Pini a strati) ──
+  const trunkMat = new THREE.MeshStandardMaterial({map: barkColorTex, normalMap: barkNormalTex, roughness: 0.95});
+  const leafMat = new THREE.MeshStandardMaterial({color: 0x041407, flatShading: true, roughness: 0.9});
+  for(let i=0; i<50; i++){
+    const x = (Math.random()-0.5)*40;
+    const z = 2 + Math.random()*35;
+    if(Math.abs(x) < 3.0) continue;
+    const h = 4 + Math.random()*3;
+    const tGeo = new THREE.CylinderGeometry(0.15,0.4,h,8,6);
+    const tv = tGeo.attributes.position.array;
+    for(let j=0;j<tv.length;j+=3){
+        if(tv[j+1] > -h/2 + 0.5){
+            tv[j] += (Math.random()-0.5)*0.15;
+            tv[j+2] += (Math.random()-0.5)*0.15;
+        }
+    }
+    tGeo.computeVertexNormals();
+    const trunk = new THREE.Mesh(tGeo, trunkMat);
+    const ey = getOutdoorElevation(x, z);
+    trunk.position.set(x, h/2 + ey + 0.02, z);
+    const layers = 3 + Math.floor(Math.random()*3);
+    for(let l=0; l<layers; l++){
+        const lh = 3 + Math.random();
+        const lw = 2.5 - (l*0.4);
+        const lGeo = new THREE.ConeGeometry(lw, lh, 7, 2);
+        const lv = lGeo.attributes.position.array;
+        for(let j=0;j<lv.length;j+=3){ lv[j]+=(Math.random()-0.5)*0.4; lv[j+1]+=(Math.random()-0.5)*0.4; lv[j+2]+=(Math.random()-0.5)*0.4; }
+        lGeo.computeVertexNormals();
+        const leaves = new THREE.Mesh(lGeo, leafMat);
+        leaves.position.set(x, h + ey + 0.02 - (l*1.2), z);
+        outdoorGroup.add(leaves);
+    }
+    outdoorGroup.add(trunk);
+  }
+
+  // Luce lunare
+  const moonLight = new THREE.DirectionalLight(0x4466aa, 0.45);
+  moonLight.position.set(10, 20, 10);
+  outdoorGroup.add(moonLight);
+
+  // ── Lucciole esterne ──
+  const OUT_FF_COUNT = 80;
+  const outFFGeo = new THREE.BufferGeometry();
+  const outFFPos = new Float32Array(OUT_FF_COUNT * 3);
+  const outFFPhase = new Float32Array(OUT_FF_COUNT);
+  const outFFBase = new Float32Array(OUT_FF_COUNT * 3); // posizione base
+  for(let i=0; i<OUT_FF_COUNT; i++){
+    const fx = (Math.random()-0.5)*40;
+    const fz = 5 + Math.random()*35;
+    const fy = 0.8 + Math.random()*2.5;
+    outFFBase[i*3] = fx; outFFBase[i*3+1] = fy; outFFBase[i*3+2] = fz;
+    outFFPos[i*3] = fx; outFFPos[i*3+1] = fy; outFFPos[i*3+2] = fz;
+    outFFPhase[i] = Math.random()*Math.PI*2;
+  }
+  outFFGeo.setAttribute('position', new THREE.BufferAttribute(outFFPos, 3));
+  outFFGeo.setAttribute('phase', new THREE.BufferAttribute(outFFPhase, 1));
+  const outFFMat = new THREE.PointsMaterial({
+    color: 0xaaff44, size: 0.06, transparent: true, opacity: 0.85,
+    blending: THREE.AdditiveBlending, depthWrite: false, map: glowTex
+  });
+  const outFFMesh = new THREE.Points(outFFGeo, outFFMat);
+  window.outdoorFirefliesGeo = outFFGeo;
+  window.outdoorFirefliesBase = outFFBase;
+  window.outdoorFirefliesCount = OUT_FF_COUNT;
+  outdoorGroup.add(outFFMesh);
+
+  scene.add(outdoorGroup);
+}
+buildOutdoor();
+
+/* --- punti "t" chiave lungo il percorso (0..1) --- */
+const T = {
+  entrance:      0.0,
+  evento1:       0.085,
+  quest1:        0.185,
+  symbolA:       0.235,
+  gate1:         0.26,
+  special1:      0.335,
+  fork:          0.40,
+  symbolB:       0.445,
+  bridge:        0.60,
+  gateBridge:    0.615,
+  symbolC:       0.655,
+  special2:      0.71,
+  door:          0.80,
+  gateDoor:      0.805,
+  soglia:        0.90,
+  finalCrystal:  0.965
+};
+
+/* =========================================================================
+   DIRAMAZIONE DEL BIVIO (quest 2) — un vero tunnel secondario che si
+   stacca dalla spina dorsale e termina in un crollo, non un semplice
+   testo di scelta.
+   ========================================================================= */
+const forkFrame = mainPath.frameAt(T.fork);
+const forkR = mainPath.baseRadiusAt(T.fork);
+const forkSide = 1; // lato verso cui devia la diramazione
+function fp(along, lateral, vert){
+  return forkFrame.center.clone()
+    .add(forkFrame.tangent.clone().multiplyScalar(along))
+    .add(forkFrame.normal.clone().multiplyScalar(lateral*forkSide))
+    .add(new THREE.Vector3(0,vert,0));
+}
+const BRANCH_WAYPOINTS = [
+  { p: forkFrame.center.toArray(), r: forkR*0.92 },
+  { p: fp(2.6, 2.4, 0.15).toArray(), r: 1.7 },
+  { p: fp(5.0, 5.4, 0.05).toArray(), r: 1.55 },
+  { p: fp(6.6, 8.4, -0.05).toArray(), r: 1.3 }
+];
+const branchPath = makePath(BRANCH_WAYPOINTS);
+const branchMesh = buildCaveTube(branchPath, { noiseSeed:31.7 });
+scene.add(branchMesh);
+
+// crollo di macerie che tappa il fondo della diramazione
+{
+  const capFrame = branchPath.frameAt(1);
+  const capGroup = new THREE.Group();
+  capGroup.position.copy(branchPath.surfacePoint(0.985, Math.PI*1.5, 0.2));
+  const rubbleCapMat = new THREE.MeshStandardMaterial({ color:0x2c2116, map:rockColorTex, normalMap:rockNormalTex, normalScale:new THREE.Vector2(1.5,1.5), roughness:0.95 });
+  for(let i=0;i<10;i++){
+    const s = 0.22+Math.random()*0.3;
+    const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(s,0), rubbleCapMat);
+    rock.position.set((Math.random()-0.5)*1.6, (Math.random()-0.2)*1.3, (Math.random()-0.5)*1.0);
+    rock.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3);
+    rock.castShadow = true; rock.receiveShadow = true;
+    capGroup.add(rock);
+  }
+  scene.add(capGroup);
+}
+
+/* =========================================================================
+   MINERALI BIANCHI (unica famiglia, solo bianco luminoso, incastonati
+   nelle pareti/soffitto — mai fluttuanti a caso). Sono minabili col
+   piccone: un colpo e si staccano, riempiendo l'hotbar.
+   ========================================================================= */
+const oreFields = []; // { inst, tier, brokenSet, baseEmissive }
+const ORE_TIERS = {
+  carbone: { size:0.10, emissive:0.7, jitter:0.45 },
+  ferro:   { size:0.14, emissive:0.9, jitter:0.40 },
+  oro:     { size:0.18, emissive:1.1, jitter:0.35 }
+};
+const oreShimmerMats = [];
+function makeOreMaterial(tierName){
+  const t = ORE_TIERS[tierName];
+  const mat = new THREE.MeshPhysicalMaterial({
+    color:0xf0f4ff, emissive:0xeef4ff, emissiveIntensity:t.emissive,
+    roughness:0.18, metalness:0.08, clearcoat:1.0, clearcoatRoughness:0.08,
+    transmission:0.05
+  });
+  mat.userData.baseEmissive = t.emissive;
+  mat.userData.seed = Math.random()*10;
+  oreShimmerMats.push(mat);
+  return mat;
+}
+function placeOreField(path, tMin, tMax, count, tierName, opts={}){
+  const t = ORE_TIERS[tierName];
+  // Cluster geometry: merge multiple shards into one geometry for natural look
+  const clusterGeo = new THREE.BufferGeometry();
+  const shardGeos = [];
+  const shardCount = 3 + Math.floor(Math.random()*3); // 3-5 shards per cluster
+  for(let s=0; s<shardCount; s++){
+    const sGeo = new THREE.OctahedronGeometry(t.size*(0.5+Math.random()*0.8), 0);
+    const m = new THREE.Matrix4();
+    m.makeRotationFromEuler(new THREE.Euler(Math.random()*3,Math.random()*3,Math.random()*3));
+    m.setPosition(new THREE.Vector3((Math.random()-0.5)*t.size*1.5,(Math.random()-0.5)*t.size*1.2,(Math.random()-0.5)*t.size*1.5));
+    sGeo.applyMatrix4(m);
+    shardGeos.push(sGeo);
+  }
+  const mergedGeo = THREE.BufferGeometryUtils ? THREE.BufferGeometryUtils.mergeBufferGeometries(shardGeos) : shardGeos[0];
+  const geo = mergedGeo || new THREE.OctahedronGeometry(t.size, 0);
+  const mat = makeOreMaterial(tierName);
+  const inst = new THREE.InstancedMesh(geo, mat, count);
+  inst.receiveShadow = true;
+  const dummy = new THREE.Object3D();
+  const placements = [];
+  for(let i=0;i<count;i++){
+    const tt = tMin + Math.random()*(tMax-tMin);
+    const theta = (-14 + Math.random()*208) * Math.PI/180;
+    const p = path.surfacePoint(tt, theta, opts.embed || 0.88);
+    dummy.position.copy(p);
+    dummy.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3);
+    const s = 0.6+Math.random()*t.jitter*2.5;
+    dummy.scale.setScalar(s);
+    dummy.updateMatrix();
+    inst.setMatrixAt(i, dummy.matrix);
+    placements.push({ matrix:dummy.matrix.clone(), broken:false });
+  }
+  inst.instanceMatrix.needsUpdate = true;
+  scene.add(inst);
+  const field = { inst, tier:tierName, placements, count };
+  oreFields.push(field);
+  return field;
+}
+placeOreField(mainPath, 0.02, T.gate1-0.01, 18, 'carbone');
+placeOreField(mainPath, T.gate1+0.02, T.gateBridge-0.01, 16, 'ferro');
+placeOreField(mainPath, T.gateBridge+0.02, T.gateDoor-0.01, 13, 'oro');
+placeOreField(branchPath, 0.12, 0.9, 5, 'carbone', { embed:0.88 });
+
+// bagliore ambientale sui cluster di minerali — più punti luce distribuiti
+[0.06, 0.12, 0.18, 0.28, 0.36, 0.45, 0.52, 0.62, 0.7, 0.78, 0.88].forEach((t)=>{
+  const theta = (Math.PI*0.5) + (hashNoise(t*7,t*13)*0.5+0.5)*Math.PI;
+  const p = mainPath.surfacePoint(t, theta, 0.88);
+  const light = new THREE.PointLight(0xd8e4ff, 0.35, 3.5, 2);
+  light.position.copy(p);
+  scene.add(light);
+  const spriteMat = new THREE.SpriteMaterial({ map: glowTex, color:0xd8e4ff, transparent:true, opacity:0.3, blending:THREE.AdditiveBlending, depthWrite:false });
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.position.copy(p); sprite.scale.setScalar(0.8);
+  scene.add(sprite);
+});
+
+/* =========================================================================
+   TORCE — l'illuminazione principale della grotta, insieme al bagliore
+   dei minerali. Poche luci puntuali per non appesantire il render.
+   ========================================================================= */
+const torches = [];
+function addTorch(path, t, theta, withLight=true){
+  const stick = path.surfacePoint(t, theta, 0.88);
+  const group = new THREE.Group();
+  group.position.copy(stick);
+
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.045,0.55,6), new THREE.MeshStandardMaterial({color:0x8a6f52, map:woodTex, roughness:0.85}));
+  pole.position.y = 0.25;
+  group.add(pole);
+
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map:glowTex, color:0xff8c20, transparent:true, opacity:0.4, blending:THREE.AdditiveBlending, depthWrite:false }));
+  halo.position.y = 0.62;
+  halo.scale.setScalar(1.4);
+  group.add(halo);
+
+  const flame = new THREE.Sprite(new THREE.SpriteMaterial({ map:flameTex, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false }));
+  flame.position.y = 0.62;
+  flame.scale.setScalar(0.55);
+  group.add(flame);
+
+  // solo una torcia su tre porta una luce dinamica reale (per restare
+  // fluido su smartphone); le altre restano visivamente accese grazie
+  // alla fiamma e al bagliore, ma senza costo di illuminazione extra.
+  let light = null;
+  if(withLight){
+    // Luce fioca e suggestiva
+    light = new THREE.PointLight(0xff8c20, 0.65, 30.0, 1.0);
+    light.position.y = 0.62;
+    group.add(light);
+  }
+
+  scene.add(group);
+  torches.push({group, flame, halo, light, seed:Math.random()*10});
+}
+// Meno torce, distribuite irregolarmente — zone buie ampie tra una e l'altra
+const mainTorchT = [0.025,0.10,0.19,0.30,0.40,0.50,0.59,0.67,0.75,0.83,0.91,0.96];
+const TORCH_THETA_A = (12/180)*Math.PI;
+const TORCH_THETA_B = (172/180)*Math.PI;
+mainTorchT.forEach((t,i)=>{
+  const theta = (i%2===0)? TORCH_THETA_A : TORCH_THETA_B;
+  addTorch(mainPath, t, theta, i%2===0);
+});
+[0.2,0.55,0.85].forEach((t,i)=>{
+  const theta = (i%2===0)? TORCH_THETA_A : TORCH_THETA_B;
+  addTorch(branchPath, t, theta, i===0);
+});
+
+/* =========================================================================
+   POLVERE IN SOSPENSIONE
+   ========================================================================= */
+const DUST_COUNT = 380;
+const dustGeo = new THREE.BufferGeometry();
+const dustPos = new Float32Array(DUST_COUNT*3);
+for(let i=0;i<DUST_COUNT;i++){
+  const t = Math.random();
+  const p = mainPath.surfacePoint(t, Math.random()*Math.PI*2, Math.random()*0.7);
+  dustPos[i*3]=p.x; dustPos[i*3+1]=p.y; dustPos[i*3+2]=p.z;
+}
+dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos,3));
+const dustTex = makeRadialTexture('rgba(255,235,210,0.9)','rgba(255,235,210,0)');
+const dustMat = new THREE.PointsMaterial({ size:0.055, map:dustTex, transparent:true, opacity:0.35, blending:THREE.AdditiveBlending, depthWrite:false });
+const dustPoints = new THREE.Points(dustGeo, dustMat);
+scene.add(dustPoints);
+
+/* =========================================================================
+   MACERIE SUL PAVIMENTO — dettaglio che ancora la grotta al suolo
+   ========================================================================= */
+const rubbleGeo = new THREE.IcosahedronGeometry(0.14,0);
+const rubbleTex = rockColorTex.clone(); rubbleTex.needsUpdate = true; rubbleTex.repeat.set(1,1);
+const rubbleBumpTex = rockNormalTex.clone(); rubbleBumpTex.needsUpdate = true; rubbleBumpTex.repeat.set(1,1);
+const rubbleMat = new THREE.MeshStandardMaterial({ color:0x1e1810, map:rubbleTex, bumpMap:rubbleBumpTex, bumpScale:0.03, roughness:1 });
+const RUBBLE_COUNT = 170;
+const rubbleInst = new THREE.InstancedMesh(rubbleGeo, rubbleMat, RUBBLE_COUNT);
+rubbleInst.receiveShadow = true;
+{
+  const dummy = new THREE.Object3D();
+  for(let i=0;i<RUBBLE_COUNT;i++){
+    // Distribute across main path and some in branch
+    const onBranch = i > RUBBLE_COUNT*0.85;
+    const usePath = onBranch ? branchPath : mainPath;
+    const t = onBranch ? Math.random() : i/(RUBBLE_COUNT*0.85);
+    const theta = Math.PI*1.5 + (Math.random()-0.5)*1.4;
+    const p = usePath.surfacePoint(t, theta, 0.68);
+    dummy.position.copy(p);
+    dummy.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3);
+    dummy.scale.setScalar(0.4+Math.random()*1.6);
+    dummy.updateMatrix();
+    rubbleInst.setMatrixAt(i,dummy.matrix);
+  }
+  rubbleInst.instanceMatrix.needsUpdate = true;
+}
+scene.add(rubbleInst);
+
+/* =========================================================================
+   AUDIO (procedurale, nessun file esterno)
+   ========================================================================= */
+let audioCtx=null, masterGain=null, muted=false, bgMusic=null, textSound=null;
+function startAudio(){
+  if(audioCtx) return;
+  audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  masterGain = audioCtx.createGain(); masterGain.gain.value = 0.5;
+  masterGain.connect(audioCtx.destination);
+
+  const filt = audioCtx.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value=220;
+  filt.connect(masterGain);
+  [55,58.5].forEach(f=>{
+    const o = audioCtx.createOscillator(); o.type='sine'; o.frequency.value=f;
+    const g = audioCtx.createGain(); g.gain.value=0.05;
+    o.connect(g); g.connect(filt); o.start();
+  });
+
+  // Vento di sottofondo
+  const windBuf = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
+  const wData = windBuf.getChannelData(0);
+  for(let i=0; i<wData.length; i++) wData[i] = Math.random()*2 - 1;
+  const windSource = audioCtx.createBufferSource();
+  windSource.buffer = windBuf; windSource.loop = true;
+  const windFilt = audioCtx.createBiquadFilter();
+  windFilt.type = 'lowpass'; windFilt.frequency.value = 150;
+  const windGain = audioCtx.createGain(); windGain.gain.value = 0.0; // Vento eliminato
+  windSource.connect(windFilt); windFilt.connect(windGain); windGain.connect(masterGain);
+  windSource.start();
+
+  window.playFootstep = function(){
+    if(!audioCtx || muted) return;
+    const t = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    osc.type = 'triangle'; osc.frequency.setValueAtTime(120, t); osc.frequency.exponentialRampToValueAtTime(30, t+0.08);
+    const noise = audioCtx.createBufferSource(); noise.buffer = windBuf;
+    const nFilt = audioCtx.createBiquadFilter(); nFilt.type = 'lowpass'; nFilt.frequency.value = 800;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.8, t+0.02); g.gain.exponentialRampToValueAtTime(0.001, t+0.1); // Passi abbassati e bilanciati
+    osc.connect(g); noise.connect(nFilt); nFilt.connect(g); g.connect(masterGain);
+    osc.start(t); osc.stop(t+0.1);
+    noise.start(t); noise.stop(t+0.1);
+  };
+
+  function scheduleDrip(){
+    const t = audioCtx.currentTime + 3 + Math.random()*7;
+    const o = audioCtx.createOscillator(); o.type='sine';
+    o.frequency.setValueAtTime(1400,t); o.frequency.exponentialRampToValueAtTime(650,t+0.18);
+    const g = audioCtx.createGain(); g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.09,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+0.35);
+    o.connect(g); g.connect(masterGain);
+    o.start(t); o.stop(t+0.4);
+    setTimeout(scheduleDrip, (t-audioCtx.currentTime+1)*1000);
+  }
+  scheduleDrip();
+
+  // Carica e riproduce la musica di sottofondo
+  bgMusic = new Audio('musica/colonna.mp3');
+  bgMusic.loop = true;
+  bgMusic.volume = 0.12; // volume abbassato per far sentire gli effetti ambientali
+  bgMusic.muted = muted;
+  bgMusic.play().catch(e => console.error("Errore nel riprodurre la musica di sottofondo:", e));
+
+  // Carica il suono di comparsa dei testi
+  textSound = new Audio('suoni testi/sound.mp3');
+  textSound.loop = true;
+  textSound.volume = 0.40; // volume bilanciato
+  textSound.muted = muted;
+
+  document.getElementById('muteBtn').style.display='flex';
+}
+document.getElementById('muteBtn').addEventListener('click', ()=>{
+  muted = !muted;
+  if(masterGain) masterGain.gain.value = muted?0:0.5;
+  if(bgMusic) bgMusic.muted = muted;
+  if(textSound) textSound.muted = muted;
+  document.getElementById('muteBtn').textContent = muted?'✕':'♪';
+});
+
+function playThud(strength=1){
+  if(!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const o = audioCtx.createOscillator(); o.type='triangle';
+  o.frequency.setValueAtTime(120*strength, t); o.frequency.exponentialRampToValueAtTime(45, t+0.12);
+  const g = audioCtx.createGain(); g.gain.setValueAtTime(0.22,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.16);
+  o.connect(g); g.connect(masterGain); o.start(t); o.stop(t+0.2);
+  const noise = audioCtx.createBufferSource();
+  const buf = audioCtx.createBuffer(1, audioCtx.sampleRate*0.08, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for(let i=0;i<data.length;i++) data[i] = (Math.random()*2-1)*(1-i/data.length);
+  noise.buffer = buf;
+  const ng = audioCtx.createGain(); ng.gain.value = 0.12;
+  noise.connect(ng); ng.connect(masterGain); noise.start(t);
+}
+function playChime(pitchIndex=0){
+  if(!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const freqs = [523.25,659.25,783.99,987.77,1174.7,1396.9];
+  const f = freqs[Math.min(pitchIndex, freqs.length-1)];
+  const o = audioCtx.createOscillator(); o.type='sine'; o.frequency.value=f;
+  const g = audioCtx.createGain(); g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(0.16, t+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+1.1);
+  o.connect(g); g.connect(masterGain); o.start(t); o.stop(t+1.2);
+  const o2 = audioCtx.createOscillator(); o2.type='sine'; o2.frequency.value=f*2;
+  const g2 = audioCtx.createGain(); g2.gain.setValueAtTime(0.0001,t);
+  g2.gain.exponentialRampToValueAtTime(0.05, t+0.02);
+  g2.gain.exponentialRampToValueAtTime(0.0001, t+0.8);
+  o2.connect(g2); g2.connect(masterGain); o2.start(t); o2.stop(t+0.9);
+}
+function playGrind(){
+  if(!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const noise = audioCtx.createBufferSource();
+  const buf = audioCtx.createBuffer(1, audioCtx.sampleRate*1.4, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for(let i=0;i<data.length;i++) data[i] = (Math.random()*2-1)*0.6;
+  noise.buffer = buf;
+  const filt = audioCtx.createBiquadFilter(); filt.type='bandpass'; filt.frequency.value=180; filt.Q.value=1.4;
+  const g = audioCtx.createGain(); g.gain.setValueAtTime(0.0001,t);
+  g.gain.linearRampToValueAtTime(0.18, t+0.5); g.gain.linearRampToValueAtTime(0.0001, t+1.4);
+  noise.connect(filt); filt.connect(g); g.connect(masterGain); noise.start(t); noise.stop(t+1.4);
+}
+function playSparkle(){
+  if(!audioCtx) return;
+  for(let i=0;i<10;i++){
+    const t = audioCtx.currentTime + i*0.045 + Math.random()*0.02;
+    const o = audioCtx.createOscillator(); o.type='sine';
+    o.frequency.value = 900+Math.random()*1400;
+    const g = audioCtx.createGain(); g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.08, t+0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+0.3);
+    o.connect(g); g.connect(masterGain); o.start(t); o.stop(t+0.32);
+  }
+}
+
+/* =========================================================================
+   PICCONE — view-model in prima persona, in basso a destra
+   ========================================================================= */
+const pickaxeGroup = new THREE.Group();
+  const voxels = [
+    "      333      ",
+    "    3555553    ",
+    "  35444444453  ",
+    " 3544333334453 ",
+    " 3443 121 3443 ",
+    " 343  121  343 ",
+    " 33   121   33 ",
+    "      121      ",
+    "      121      ",
+    "      121      ",
+    "      121      ",
+    "      121      ",
+    "      121      ",
+    "      111      "
+  ];
+  const mats = {
+    '1': new THREE.MeshStandardMaterial({color:0x312111, roughness:0.9}), // legno scuro
+    '2': new THREE.MeshStandardMaterial({color:0x6d4926, roughness:0.8}), // legno manico
+    '3': new THREE.MeshStandardMaterial({color:0x3e444a, roughness:0.5, metalness:0.7}), // bordo ferro
+    '4': new THREE.MeshStandardMaterial({color:0xb6c0c5, roughness:0.3, metalness:0.9}), // ferro medio
+    '5': new THREE.MeshStandardMaterial({color:0xffffff, roughness:0.2, metalness:1.0})  // highlight ferro
+  };
+  const bSize = 0.028;
+  const boxGeo = new THREE.BoxGeometry(bSize, bSize, bSize);
+  for(let r=0; r<voxels.length; r++) {
+    for(let c=0; c<voxels[r].length; c++) {
+      const char = voxels[r][c];
+      if(char !== ' ') {
+        const mesh = new THREE.Mesh(boxGeo, mats[char]);
+        // Centriamo la x, facciamo partire la y dal manico (r=13 è y=0)
+        mesh.position.set( (c - 7) * bSize, (13 - r) * bSize, 0 );
+        mesh.castShadow = false; mesh.receiveShadow = false;
+        pickaxeGroup.add(mesh);
+      }
+    }
+  }
+  // Aggiustiamo l'inclinazione per la visuale in prima persona
+  pickaxeGroup.rotation.z = Math.PI * 0.1;
+pickaxeGroup.position.set(0.36, -0.34, -0.62);
+pickaxeGroup.rotation.set(0.15, -0.35, 0.25);
+pickaxeGroup.scale.setScalar(0.92);
+camera.add(pickaxeGroup);
+scene.add(camera);
+
+let pickaxeSwing = 0; // 0..1, animazione di colpo in corso
+let pickaxeSwingT = 0;
+const PICKAXE_SWING_DUR = 0.34;
+function swingPickaxe(){
+  pickaxeSwingT = 0.0001;
+}
+function easeOutCubic(x){ return 1-Math.pow(1-x,3); }
+
+/* =========================================================================
+   COSTRUZIONE HUD (cuori, profondità, hotbar, simboli)
+   ========================================================================= */
+const HEART_SVG = '<svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-10-9.3C.4 8.1 2 4.5 5.5 4c2-.3 3.9.7 5 2.3C11.6 4.7 13.5 3.7 15.5 4c3.5.5 5.1 4.1 3.5 7.7C21.5 16.4 12 21 12 21z"/></svg>';
+const heartsEl = document.getElementById('hearts');
+for(let i=0;i<3;i++){
+  const d = document.createElement('div'); d.className='heart'; d.style.animationDelay = (i*0.05)+'s';
+  d.innerHTML = HEART_SVG;
+  heartsEl.appendChild(d);
+}
+const progressTrackEl = document.getElementById('progressTrack');
+CONFIG.stages.forEach(()=>{
+  const p = document.createElement('div'); p.className='progressPip'; progressTrackEl.appendChild(p);
+});
+const symbolTrackerEl = document.getElementById('symbolTracker');
+const symbolPipEls = [];
+{
+  const label = document.createElement('span'); label.textContent='SIMBOLI'; symbolTrackerEl.appendChild(label);
+  for(let i=0;i<3;i++){
+    const p = document.createElement('div'); p.className='symbolPip';
+    p.innerHTML = symbolSVG(i);
+    symbolTrackerEl.appendChild(p);
+    symbolPipEls.push(p);
+  }
+}
+const hotbarEl = document.getElementById('hotbar');
+const pickSlot = document.createElement('div'); pickSlot.className='slot pickSlot active';
+pickSlot.innerHTML = '<span class="glyph">⛏</span>';
+hotbarEl.appendChild(pickSlot);
+const oreSlotEls = {};
+['carbone','ferro','oro'].forEach(tier=>{
+  const s = document.createElement('div'); s.className='slot';
+  s.innerHTML = '<span class="oreDot"></span><span class="count">0</span>';
+  hotbarEl.appendChild(s);
+  oreSlotEls[tier] = { el:s, countEl: s.querySelector('.count'), count:0 };
+});
+function collectOre(tier){
+  const slot = oreSlotEls[tier];
+  if(!slot) return;
+  slot.count++;
+  slot.countEl.textContent = slot.count;
+  slot.el.classList.add('active');
+  clearTimeout(slot.el._t);
+  slot.el._t = setTimeout(()=>slot.el.classList.remove('active'), 260);
+}
+/* =========================================================================
+   GESTORE TWEEN GENERICO (per animazioni fluide: ponte, porta, crollo)
+   ========================================================================= */
+const activeTweens = [];
+function addTween(duration, onUpdate, onComplete){
+  activeTweens.push({ elapsed:0, duration, onUpdate, onComplete, done:false });
+}
+function updateTweens(delta){
+  for(let i=activeTweens.length-1;i>=0;i--){
+    const tw = activeTweens[i];
+    tw.elapsed += delta;
+    const p = clamp(tw.elapsed/tw.duration, 0, 1);
+    tw.onUpdate(p);
+    if(p>=1 && !tw.done){ tw.done=true; if(tw.onComplete) tw.onComplete(); activeTweens.splice(i,1); }
+  }
+}
+
+/* =========================================================================
+   STATO DELLE MISSIONI
+   ========================================================================= */
+const quests = {
+  crystal: { done:false },
+  bridge:  { done:false, collected:0, needed:2 },
+  door:    { done:false, pressed:new Set() }
+};
+const symbolsSeen = [false,false,false];
+function markSymbolSeen(i){
+  if(symbolsSeen[i]) return;
+  symbolsSeen[i] = true;
+  symbolPipEls[i].classList.add('on');
+  showBanner(CONFIG.symbolNote);
+  playChime(1);
+}
+
+const interactPoints = []; // { pos, radius, hint, action(ip), done }
+const minables = [];       // { mesh/inst, kind:'special'|'final', hitsRequired, hits, pos, onHit(hits), onBreak() }
+
+/* --- QUEST 1: tre cristalli, uno solo è quello giusto --- */
+const CRYSTAL_CORRECT = Math.floor(Math.random()*3);
+const crystalCandidateGroup = new THREE.Group();
+const crystalIPs = [];
+[-0.55, 0, 0.55].forEach((off,i)=>{
+  const theta = Math.PI*0.85 + off;
+  const pos = mainPath.surfacePoint(T.quest1, theta, 0.9);
+  const grp = new THREE.Group();
+  grp.position.copy(pos);
+  const mat = new THREE.MeshPhysicalMaterial({ color:0xeef2fb, emissive:0xffffff, emissiveIntensity:1.2, roughness:0.2, clearcoat:0.9, clearcoatRoughness:0.1 });
+  for(let k=0;k<4;k++){
+    const shard = new THREE.Mesh(new THREE.OctahedronGeometry(0.09+Math.random()*0.05,0), mat);
+    shard.position.set((Math.random()-0.5)*0.14,(Math.random()-0.5)*0.14,(Math.random()-0.5)*0.14);
+    shard.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3);
+    grp.add(shard);
+  }
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map:glowTex, color:0xdfe9ff, transparent:true, opacity:0.5, blending:THREE.AdditiveBlending, depthWrite:false }));
+  halo.scale.setScalar(0.7);
+  grp.add(halo);
+  crystalCandidateGroup.add(grp);
+  const ip = {
+    pos, radius:1.7, hint:"[ E ]  esamina il cristallo", done:false, id:'crystal'+i,
+    action(ip){
+      if(quests.crystal.done) return;
+      quests.crystal.done = true;
+      grp.userData.found = true;
+      playChime(3);
+      runSequence('quest1_correct');
+      crystalIPs.forEach(other=>{ other.done = true; });
+    }
+  };
+  crystalIPs.push(ip);
+  interactPoints.push(ip);
+});
+scene.add(crystalCandidateGroup);
+
+/* --- INCISIONI SIMBOLO lungo il cammino --- */
+[[T.symbolA,0],[T.symbolB,1],[T.symbolC,2]].forEach(([t,kind])=>{
+  const theta = Math.PI + (kind-1)*0.16; // parete laterale, ad altezza d'occhio
+  const pos = mainPath.surfacePoint(t, theta, 0.97); // Incastonati nella parete
+  const f = mainPath.frameAt(t);
+  
+  const plane = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.32,0.32),
+    new THREE.MeshBasicMaterial({ map:SYMBOL_TEX[kind], transparent:true, color:0x33aaff, depthWrite:false })
+  );
+  plane.position.copy(pos);
+  plane.lookAt(f.center);
+  scene.add(plane);
+  
+  // Manteniamo la luce blu per evidenziarlo
+  const light = new THREE.PointLight(0x33aaff, 1.5, 6.0, 2);
+  light.position.copy(pos);
+  // Spostiamo la luce leggermente verso il centro del tunnel perché non sia dentro la roccia
+  light.position.add(f.center.clone().sub(pos).normalize().multiplyScalar(0.4));
+  scene.add(light);
+  
+  interactPoints.push({
+    pos, radius:1.6, hint:"[ E ]  osserva l'incisione", done:false, id:'symbol'+kind,
+    action(ip){ ip.done = true; markSymbolSeen(kind); }
+  });
+});
+
+/* --- BLOCCHI DI CROLLO SPECIALI (ostruiscono davvero il tunnel) --- */
+const specialBlockMat = new THREE.MeshStandardMaterial({ color:0x342a1e, map:rockColorTex, normalMap:rockNormalTex, roughness:0.95 });
+function makeSpecialBlock(t){
+  const f = mainPath.frameAt(t);
+  const group = new THREE.Group();
+  group.position.copy(f.center);
+  for(let i=0;i<6;i++){
+    const s = 0.32+Math.random()*0.22;
+    const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(s,0), specialBlockMat);
+    rock.position.set((Math.random()-0.5)*0.9,(Math.random()-0.5)*0.7,(Math.random()-0.5)*0.5);
+    rock.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3);
+    rock.castShadow = true; rock.receiveShadow = true;
+    group.add(rock);
+  }
+  scene.add(group);
+  const rec = {
+    kind:'special', pos:group.position.clone(), hitsRequired:3, hits:0, broken:false, group,
+    onHit(hits){
+      playThud(1);
+      group.scale.setScalar(1-hits*0.08);
+      group.position.y += 0.01 - Math.random()*0.02;
+    },
+    onBreak(){
+      playGrind();
+      group.children.forEach(rock=>{
+        const y0 = rock.position.y;
+        const dropDist = 0.5+Math.random()*0.6;
+        const spinX = (Math.random()-0.5)*4, spinZ = (Math.random()-0.5)*4;
+        addTween(0.55+Math.random()*0.3, (p)=>{
+          rock.position.y = y0 - dropDist*p;
+          rock.rotation.x += spinX*0.03;
+          rock.rotation.z += spinZ*0.03;
+        });
+      });
+      setTimeout(()=>{ scene.remove(group); }, 850);
+    }
+  };
+  minables.push(rec);
+  return rec;
+}
+const special1 = makeSpecialBlock(T.special1);
+const special2 = makeSpecialBlock(T.special2);
+special1.hint = "colpisci per liberare il passaggio";
+special2.hint = "colpisci per liberare il passaggio";
+
+/* --- QUEST 3: IL PONTE --- */
+const bridgeFrame = mainPath.frameAt(T.bridge);
+const bridgeR = mainPath.baseRadiusAt(T.bridge);
+const plankMat = new THREE.MeshStandardMaterial({ color:0x5a4028, map:woodTex, roughness:0.85 });
+const chasmMat = new THREE.MeshStandardMaterial({ color:0x07060a, roughness:1, metalness:0 });
+const chasm = new THREE.Mesh(new THREE.CircleGeometry(bridgeR*0.7, 24), chasmMat);
+chasm.rotation.x = -Math.PI/2;
+chasm.position.copy(mainPath.surfacePoint(T.bridge, Math.PI*1.5, 0.62));
+chasm.position.y += 0.015;
+scene.add(chasm);
+
+// base del tunnel in questo punto: l'asse locale X delle assi corre lungo
+// la larghezza del tunnel (normale), Y verso l'alto (binormale), Z lungo
+// il senso di marcia (tangente) — così le assi risultano sempre trasversali
+// al tunnel, qualunque sia il suo orientamento nello spazio.
+const bridgeBasisMat = new THREE.Matrix4().makeBasis(bridgeFrame.normal, bridgeFrame.binormal, bridgeFrame.tangent);
+const bridgeRestQuat = new THREE.Quaternion().setFromRotationMatrix(bridgeBasisMat);
+
+const bridgePlankMeshes = [];
+for(let i=0;i<5;i++){
+  const plank = new THREE.Mesh(new THREE.BoxGeometry(bridgeR*1.3, 0.07, 0.34), plankMat);
+  const along = (i-2)*0.38;
+  const restPos = bridgeFrame.center.clone()
+    .add(bridgeFrame.tangent.clone().multiplyScalar(along))
+    .add(bridgeFrame.binormal.clone().multiplyScalar(-bridgeR*0.34));
+  plank.userData.restPosition = restPos;
+  plank.userData.restQuat = bridgeRestQuat.clone();
+
+  // stato iniziale: crollate sul fondo della voragine, alla rinfusa
+  const fallOffset = bridgeFrame.binormal.clone().multiplyScalar(-0.85)
+    .add(bridgeFrame.normal.clone().multiplyScalar((Math.random()-0.5)*1.5));
+  plank.position.copy(restPos.clone().add(fallOffset));
+  const tiltQuat = new THREE.Quaternion().setFromAxisAngle(bridgeFrame.tangent, Math.PI*0.35+Math.random()*0.3)
+    .multiply(new THREE.Quaternion().setFromAxisAngle(bridgeFrame.normal, (Math.random()-0.5)*0.5));
+  plank.quaternion.copy(bridgeRestQuat.clone().multiply(tiltQuat));
+  plank.userData.startQuat = plank.quaternion.clone();
+  plank.userData.startPos = plank.position.clone();
+  plank.castShadow = true; plank.receiveShadow = true;
+  scene.add(plank);
+  bridgePlankMeshes.push(plank);
+}
+function buildBridgeAnimation(){
+  bridgePlankMeshes.forEach((plank,i)=>{
+    const fromPos = plank.userData.startPos;
+    const fromQuat = plank.userData.startQuat;
+    addTween(0.9+i*0.12, (p)=>{
+      const e = easeOutCubic(p);
+      plank.position.lerpVectors(fromPos, plank.userData.restPosition, e);
+      THREE.Quaternion.slerp(fromQuat, plank.userData.restQuat, plank.quaternion, e);
+    });
+  });
+}
+// le due assi vanno posizionate in modo che siano facili da notare e da
+// raggiungere: fasce di parete "pulite" (come le torce), ben distanziate
+// lungo il cammino e comodamente PRIMA del cancello del ponte, non appena
+// oltre — e con una piccola luce calda + un bagliore che le fa risaltare
+// nella penombra della grotta.
+const plankPickupSpecs = [
+  { t: T.bridge-0.05,  theta: TORCH_THETA_A },
+  { t: T.bridge-0.012, theta: TORCH_THETA_B }
+];
+plankPickupSpecs.forEach((spec,i)=>{
+  const pos = mainPath.surfacePoint(spec.t, spec.theta, 0.4);
+  const pileGroup = new THREE.Group();
+  pileGroup.position.copy(pos);
+  const plankA = new THREE.Mesh(new THREE.BoxGeometry(0.62,0.07,0.26), plankMat);
+  plankA.rotation.y = Math.random()*Math.PI;
+  plankA.rotation.z = 0.08;
+  const plankB = new THREE.Mesh(new THREE.BoxGeometry(0.56,0.07,0.24), plankMat);
+  plankB.rotation.y = plankA.rotation.y + 0.9;
+  plankB.position.y = 0.06;
+  plankA.castShadow = plankB.castShadow = true;
+  pileGroup.add(plankA, plankB);
+
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map:glowTex, color:0xffcf9e, transparent:true, opacity:0.4, blending:THREE.AdditiveBlending, depthWrite:false }));
+  glow.position.y = 0.16;
+  glow.scale.setScalar(0.62);
+  pileGroup.add(glow);
+  const glowLight = new THREE.PointLight(0xffcf9e, 0.55, 3.2, 2);
+  glowLight.position.y = 0.2;
+  pileGroup.add(glowLight);
+
+  scene.add(pileGroup);
+  interactPoints.push({
+    pos, radius:1.7, hint:"[ E ]  raccogli l'asse", done:false, id:'plank'+i,
+    action(ip){
+      if(ip.done || quests.bridge.done) return;
+      ip.done = true;
+      scene.remove(pileGroup);
+      quests.bridge.collected++;
+      playThud(0.5);
+      showBanner("Asse raccolta ("+quests.bridge.collected+"/"+quests.bridge.needed+")");
+      if(quests.bridge.collected>=quests.bridge.needed){
+        quests.bridge.done = true;
+        runSequence('bridge_complete');
+        buildBridgeAnimation();
+      }
+    }
+  });
+});
+
+/* --- QUEST 4: LA PORTA A TRE SIMBOLI --- */
+const doorFrame = mainPath.frameAt(T.door);
+const doorR = mainPath.baseRadiusAt(T.door);
+const doorGroup = new THREE.Group();
+doorGroup.position.copy(doorFrame.center);
+doorGroup.lookAt(doorFrame.center.clone().add(doorFrame.tangent));
+const doorMat = new THREE.MeshStandardMaterial({ color:0x362a1c, map:rockColorTex, normalMap:rockNormalTex, roughness:0.95 });
+const doorLeft = new THREE.Mesh(new THREE.BoxGeometry(doorR*0.62,doorR*1.5,0.22), doorMat);
+const doorRight = doorLeft.clone();
+doorLeft.position.x = -doorR*0.31; doorRight.position.x = doorR*0.31;
+doorLeft.castShadow = doorRight.castShadow = true;
+doorGroup.add(doorLeft, doorRight);
+const runeMeshes = [];
+[0,1,2].forEach(k=>{
+  const rune = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.14,0.14,0.05,20),
+    new THREE.MeshStandardMaterial({ color:0xcfd6e6, emissive:0xffffff, emissiveIntensity:0.5, roughness:0.4 })
+  );
+  rune.rotation.x = Math.PI/2;
+  rune.position.set((k-1)*0.4, 0.15, 0.15);
+  const deco = new THREE.Mesh(new THREE.PlaneGeometry(0.18,0.18), new THREE.MeshBasicMaterial({ map:SYMBOL_TEX[k], transparent:true, color:0x2a2018 }));
+  deco.position.z = 0.028;
+  rune.add(deco);
+  doorGroup.add(rune);
+  runeMeshes.push(rune);
+  const worldPos = new THREE.Vector3(); rune.getWorldPosition(worldPos);
+  interactPoints.push({
+    pos: worldPos, radius:1.5, hint:"[ E ]  premi il simbolo", done:false, id:'rune'+k,
+    action(ip){
+      if(quests.door.done || quests.door.pressed.has(k)) return;
+      ip.done = true;
+      quests.door.pressed.add(k);
+      rune.material.emissiveIntensity = 1.8;
+      rune.material.color.set(0xfff2d8);
+      playChime(k);
+      showBanner("Simbolo premuto ("+quests.door.pressed.size+"/3)");
+      if(quests.door.pressed.size>=3){
+        quests.door.done = true;
+        runSequence('door_open');
+        playGrind();
+        if(typeof addShake === 'function') addShake(0.35); // Grosso tremolio quando si apre
+        const l0 = doorLeft.position.x, r0 = doorRight.position.x;
+        addTween(1.6, (p)=>{
+          const e = easeOutCubic(p);
+          doorLeft.position.x = lerp(l0, l0-doorR*0.8, e);
+          doorRight.position.x = lerp(r0, r0+doorR*0.8, e);
+        });
+      }
+    }
+  });
+});
+scene.add(doorGroup);
+
+/* =========================================================================
+   SCENOGRAFIA FINALE: CRISTALLI GIGANTI E VEGETAZIONE
+   ========================================================================= */
+const finalFloraGroup = new THREE.Group();
+
+// 1. Piccole gemme attaccate al muro
+const crystalTex = makeCrystalTexture(256);
+const giantCrystalGeo = new THREE.OctahedronGeometry(0.25, 0); // Piccole gemme
+const giantCrystalMat = new THREE.MeshStandardMaterial({ 
+  map: crystalTex, bumpMap: crystalTex, bumpScale: 0.05,
+  color: 0x88bbff, emissive: 0x114488, emissiveIntensity: 1.2, 
+  roughness: 0.1, metalness: 0.6, transparent: true, opacity: 0.9 
+});
+const NUM_GIANT_CRYSTALS = 70; // Di più, ma più piccole
+for(let i=0; i<NUM_GIANT_CRYSTALS; i++){
+  const t = T.soglia + 0.01 + Math.random()*(T.finalCrystal - T.soglia - 0.01);
+  const theta = Math.random() * Math.PI * 2;
+  const pos = mainPath.surfacePoint(t, theta, 0.96); // attaccate quasi a filo muro
+  const f = mainPath.frameAt(t);
+  
+  const mesh = new THREE.Mesh(giantCrystalGeo, giantCrystalMat);
+  mesh.position.copy(pos);
+  mesh.lookAt(f.center);
+  // Leggermente allungate
+  mesh.scale.set(1.0, 1.0, 1.2 + Math.random()*0.8);
+  mesh.rotation.z = Math.random() * Math.PI;
+  finalFloraGroup.add(mesh);
+}
+
+// 2. Funghi bioluminescenti sul pavimento
+const shroomTex = makeShroomTexture(128);
+const shroomGeo = new THREE.SphereGeometry(0.15, 8, 8, 0, Math.PI*2, 0, Math.PI/2); // Cupolette
+const shroomMat = new THREE.MeshStandardMaterial({ 
+  map: shroomTex, bumpMap: shroomTex, bumpScale: 0.02,
+  color: 0x00ffaa, emissive: 0x00aa66, emissiveIntensity: 1.5, roughness: 0.6 
+});
+const stalkGeo = new THREE.CylinderGeometry(0.04, 0.05, 0.2, 5);
+const stalkMat = new THREE.MeshStandardMaterial({ map: woodTex, color: 0x1a2b22, roughness: 0.9 });
+
+const NUM_SHROOMS = 50;
+for(let i=0; i<NUM_SHROOMS; i++){
+  const t = T.soglia + 0.02 + Math.random()*(T.finalCrystal - T.soglia + 0.02);
+  const theta = Math.PI*1.1 + Math.random()*Math.PI*0.8; // Sul fondo (pavimento e lati bassi)
+  const pos = mainPath.surfacePoint(t, theta, 0.85);
+  const f = mainPath.frameAt(t);
+
+  const shroomGrp = new THREE.Group();
+  shroomGrp.position.copy(pos);
+  shroomGrp.lookAt(f.center);
+  
+  const cap = new THREE.Mesh(shroomGeo, shroomMat);
+  cap.position.z = 0.2; // Spunta verso l'alto (z guarda verso il centro del tubo)
+  cap.scale.setScalar(0.5 + Math.random()*0.8);
+  
+  const stalk = new THREE.Mesh(stalkGeo, stalkMat);
+  stalk.position.z = 0.1;
+  stalk.rotation.x = Math.PI/2;
+  
+  shroomGrp.add(cap, stalk);
+  // Inclinazione casuale
+  shroomGrp.rotation.x += (Math.random()-0.5)*0.5;
+  shroomGrp.rotation.y += (Math.random()-0.5)*0.5;
+  finalFloraGroup.add(shroomGrp);
+}
+
+// 3. Rampicanti attaccati al muro
+const creeperTex = makeCreepersTexture(256);
+const vineGeo = new THREE.PlaneGeometry(1.2, 3.5); // Strisce piatte per simulare rampicanti
+const vineMat = new THREE.MeshStandardMaterial({ 
+  map: creeperTex, alphaTest: 0.1, transparent: true,
+  color: 0x88bb99, roughness: 1.0, side: THREE.DoubleSide 
+});
+
+const NUM_VINES = 45;
+for(let i=0; i<NUM_VINES; i++){
+  const t = T.soglia + Math.random()*(T.finalCrystal - T.soglia);
+  const theta = Math.random() * Math.PI * 2; // Ovunque sulle pareti
+  const pos = mainPath.surfacePoint(t, theta, 0.98); // Aderenti al muro
+  const f = mainPath.frameAt(t);
+  
+  const vine = new THREE.Mesh(vineGeo, vineMat);
+  vine.position.copy(pos);
+  vine.lookAt(f.center); // La faccia del plane guarda il centro, quindi è parallela al muro
+  // Ruotiamo sul piano del muro per dargli direzioni organiche
+  vine.rotation.z = Math.random() * Math.PI;
+  // Pieghiamo leggermente per spezzare la piattezza perfetta
+  vine.rotation.x += (Math.random()-0.5)*0.2;
+  finalFloraGroup.add(vine);
+}
+
+// 4. Lucciole Bioluminescenti
+window.firefliesGeo = new THREE.BufferGeometry();
+const ffPos = new Float32Array(150 * 3);
+const ffPhase = new Float32Array(150);
+for(let i=0; i<150; i++){
+  ffPos[i*3] = (Math.random()-0.5)*14;
+  ffPos[i*3+1] = Math.random()*5;
+  ffPos[i*3+2] = (Math.random()-0.5)*14;
+  ffPhase[i] = Math.random()*Math.PI*2;
+}
+window.firefliesGeo.setAttribute('position', new THREE.BufferAttribute(ffPos, 3));
+window.firefliesGeo.setAttribute('phase', new THREE.BufferAttribute(ffPhase, 1));
+const firefliesMat = new THREE.PointsMaterial({
+  color: 0xccff00, size: 0.05, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
+});
+const firefliesMesh = new THREE.Points(window.firefliesGeo, firefliesMat);
+firefliesMesh.position.copy(mainPath.surfacePoint(T.door, Math.PI, 0.0));
+finalFloraGroup.add(firefliesMesh);
+
+scene.add(finalFloraGroup);
+
+/* =========================================================================
+   QUEST 5 — IL CRISTALLO FINALE
+   ========================================================================= */
+const finalCenter = mainPath.surfacePoint(T.finalCrystal, Math.PI*1.5, 0.55);
+const crystalGroup = new THREE.Group();
+crystalGroup.position.copy(finalCenter);
+crystalGroup.position.y += 0.95;
+
+const pedestalTex = rockColorTex.clone(); pedestalTex.needsUpdate = true; pedestalTex.repeat.set(2,1);
+const pedestalBump = rockNormalTex.clone(); pedestalBump.needsUpdate = true; pedestalBump.repeat.set(2,1);
+const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.65,0.9,8), new THREE.MeshStandardMaterial({color:0x342a20, map:pedestalTex, bumpMap:pedestalBump, bumpScale:0.03, roughness:0.92}));
+pedestal.position.y = -0.52;
+pedestal.castShadow = true; pedestal.receiveShadow = true;
+crystalGroup.add(pedestal);
+
+const finalCrystalMat = new THREE.MeshPhysicalMaterial({ color:0xf3f6ff, emissive:0xffffff, emissiveIntensity:1.4, roughness:0.08, metalness:0.1, clearcoat:1.0, clearcoatRoughness:0.05 });
+const crystalShards = [];
+for(let i=0;i<7;i++){
+  const shard = new THREE.Mesh(new THREE.OctahedronGeometry(0.19+Math.random()*0.14,0), finalCrystalMat);
+  const a = (i/7)*Math.PI*2;
+  shard.position.set(Math.cos(a)*0.16, Math.sin(i*1.7)*0.12, Math.sin(a)*0.16);
+  shard.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3);
+  shard.castShadow = true;
+  crystalGroup.add(shard);
+  crystalShards.push(shard);
+}
+const crystalCore = new THREE.Sprite(new THREE.SpriteMaterial({ map:glowTex, color:0xffffff, transparent:true, opacity:0.6, blending:THREE.AdditiveBlending, depthWrite:false }));
+crystalCore.scale.setScalar(1.05);
+crystalGroup.add(crystalCore);
+scene.add(crystalGroup);
+
+const crackSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map:crackTex, color:0x0a0e14, transparent:true, opacity:0, depthWrite:false }));
+crackSprite.scale.setScalar(0.85);
+crackSprite.position.z = 0.02;
+crystalGroup.add(crackSprite);
+
+const crystalLight = new THREE.PointLight(0xdfe9ff, 2.0, 13, 2);
+crystalLight.position.copy(crystalGroup.position);
+scene.add(crystalLight);
+
+const spot = new THREE.SpotLight(0xf3ecdd, 1.5, 16, Math.PI*0.18, 0.5, 1.5);
+spot.position.set(finalCenter.x, finalCenter.y+3.2, finalCenter.z+0.4);
+spot.target = crystalGroup;
+spot.castShadow = true;
+spot.shadow.mapSize.set(1024,1024);
+scene.add(spot); scene.add(spot.target);
+
+let finalReady = false; // diventa true dopo la battuta "Finalmente l'ho trovato..."
+const finalCrystalRec = {
+  kind:'final', pos: crystalGroup.position.clone(), hitsRequired:5, hits:0, broken:false, group:crystalGroup,
+  hint: "[ click ]  colpisci il cristallo",
+  onHit(hits){
+    playChime(hits);
+    crystalLight.intensity = 2.0 + hits*1.1;
+    crackSprite.material.opacity = Math.min(0.85, hits*0.19);
+    finalCrystalMat.emissiveIntensity = 1.4 + hits*0.35;
+    const s0 = crystalGroup.scale.x;
+    addTween(0.16, (p)=>{
+      const bump = Math.sin(p*Math.PI)*0.12;
+      crystalGroup.scale.setScalar(1+bump);
+    });
+    document.getElementById('vignette').style.background =
+      'radial-gradient(ellipse at center, rgba(255,255,255,'+(hits*0.03)+') 30%, rgba(0,0,0,0.55) 100%)';
+  },
+  onBreak(){
+    playSparkle();
+    spawnParticleBurst(crystalGroup.getWorldPosition(new THREE.Vector3()));
+    const flash = document.getElementById('whiteFlash');
+    flash.style.transition = 'opacity .08s ease';
+    flash.style.opacity = '1';
+    setTimeout(()=>{ flash.style.transition='opacity 1.2s ease'; flash.style.opacity='0'; }, 90);
+    setTimeout(()=>{ triggerEnding(); }, 900);
+  }
+};
+
+/* piccola esplosione di particelle bianche */
+const burstGeo = new THREE.BufferGeometry();
+const BURST_COUNT = 140;
+const burstPos = new Float32Array(BURST_COUNT*3);
+const burstVel = new Float32Array(BURST_COUNT*3);
+let burstLife = 0;
+for(let i=0;i<BURST_COUNT;i++){ burstPos[i*3]=0;burstPos[i*3+1]=-999;burstPos[i*3+2]=0; }
+burstGeo.setAttribute('position', new THREE.BufferAttribute(burstPos,3));
+const burstMat = new THREE.PointsMaterial({ size:0.09, map:glowTex, color:0xffffff, transparent:true, opacity:1, blending:THREE.AdditiveBlending, depthWrite:false });
+const burstPoints = new THREE.Points(burstGeo, burstMat);
+scene.add(burstPoints);
+function spawnParticleBurst(center){
+  burstLife = 1.4;
+  for(let i=0;i<BURST_COUNT;i++){
+    const dir = new THREE.Vector3(Math.random()-0.5, Math.random()*0.8, Math.random()-0.5).normalize();
+    const speed = 1.2+Math.random()*2.2;
+    burstVel[i*3]=dir.x*speed; burstVel[i*3+1]=dir.y*speed+1.0; burstVel[i*3+2]=dir.z*speed;
+    burstPos[i*3]=center.x; burstPos[i*3+1]=center.y; burstPos[i*3+2]=center.z;
+  }
+  burstGeo.attributes.position.needsUpdate = true;
+  burstMat.opacity = 1;
+}
+
+/* =========================================================================
+   CANCELLI DI PROGRESSIONE — il percorso resta continuo, ma non si
+   avanza oltre finché la missione corrispondente non è risolta.
+   ========================================================================= */
+finalCrystalRec.pos = crystalGroup.position.clone();
+minables.push(finalCrystalRec);
+const GATES = [
+  { afterT:T.gate1,      unlocked:()=>quests.crystal.done,
+    blockedHint:"Non me la sento di andare oltre. Prima devo trovare il cristallo giusto, qui vicino." },
+  { afterT:T.special1,   unlocked:()=>special1.broken,
+    blockedHint:"Il crollo di roccia blocca il passaggio. Devo colpirlo col piccone." },
+  { afterT:T.gateBridge, unlocked:()=>quests.bridge.done,
+    blockedHint:"Senza il ponte non posso attraversare la voragine. Mi servono le assi." },
+  { afterT:T.special2,   unlocked:()=>special2.broken,
+    blockedHint:"Un'altra ostruzione di roccia. Devo colpirla per liberare il passaggio." },
+  { afterT:T.gateDoor,   unlocked:()=>quests.door.done,
+    blockedHint:"La porta antica resta chiusa. Devo premere i tre simboli giusti." }
+];
+function clampTForGates(t){
+  for(const g of GATES){ if(!g.unlocked() && t>g.afterT) return g.afterT; }
+  return t;
+}
+function activeGateHint(t){
+  for(const g of GATES){ if(!g.unlocked()){ return t>g.afterT-0.05 ? g.blockedHint : null; } }
+  return null;
+}
+
+/* --- fondo della diramazione: qui non c'è il tesoro --- */
+{
+  const deadEndPos = branchPath.surfacePoint(0.94, Math.PI*1.5, 0.5);
+  const ip = { pos:deadEndPos, radius:2.0, hint:"[ E ]  osserva", done:false, id:'forkdeadend' };
+  ip.action = function(){ ip.done = true; runSequence('fork_deadend'); };
+  interactPoints.push(ip);
+}
+
+/* --- banner leggero per le missioni (senza interrompere il ritmo) --- */
+let bannerTimeout = null;
+function showBanner(text, duration=2200){
+  const el = document.getElementById('questBanner');
+  el.textContent = text;
+  el.style.display = 'block';
+  requestAnimationFrame(()=>el.classList.add('show'));
+  clearTimeout(bannerTimeout);
+  bannerTimeout = setTimeout(()=>{
+    el.classList.remove('show');
+    setTimeout(()=>{ el.style.display='none'; }, 500);
+  }, duration);
+}
+
+function updateStageHUD(t){
+  let stageIdx = 0;
+  if(t>=T.gate1) stageIdx=1;
+  if(t>=T.gateBridge) stageIdx=2;
+  if(t>=T.gateDoor) stageIdx=3;
+  if(t>=T.finalCrystal) stageIdx=4;
+  document.getElementById('levelNum').textContent = stageIdx+1;
+  document.getElementById('stageName').textContent = CONFIG.stages[stageIdx];
+  const depth = Math.round(12 + t*96);
+  document.getElementById('depthVal').textContent = depth;
+  [...progressTrackEl.children].forEach((el,i)=>el.classList.toggle('on', i<=stageIdx));
+}
+
+/* =========================================================================
+   SCAVO — raycaster dal centro schermo, minerali ambientali + oggetti
+   speciali (blocchi di crollo, cristallo finale)
+   ========================================================================= */
+function playTink(){
+  if(!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const o = audioCtx.createOscillator(); o.type='sine';
+  o.frequency.setValueAtTime(1700+Math.random()*700, t);
+  o.frequency.exponentialRampToValueAtTime(850, t+0.09);
+  const g = audioCtx.createGain(); g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(0.13, t+0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+0.16);
+  o.connect(g); g.connect(masterGain); o.start(t); o.stop(t+0.18);
+}
+const raycaster = new THREE.Raycaster();
+function tryMineHit(){
+  raycaster.setFromCamera({x:0,y:0}, camera);
+  for(const m of minables){
+    if(m.broken) continue;
+    if(m.kind==='final' && !finalReady) continue;
+    const d = camera.position.distanceTo(m.pos);
+    if(d>3.1) continue;
+    const targets = m.group ? m.group.children : [m.mesh];
+    const hits = raycaster.intersectObjects(targets, true);
+    if(hits.length){
+      m.hits++;
+      m.onHit && m.onHit(m.hits);
+      if(m.hits>=m.hitsRequired){ m.broken = true; m.onBreak && m.onBreak(); }
+      if(typeof addShake === 'function') addShake(0.08); // shake sul colpo
+      return hits[0].point;
+    }
+  }
+  for(const field of oreFields){
+    const hits = raycaster.intersectObject(field.inst);
+    if(hits.length && hits[0].instanceId!=null && hits[0].distance<3.0){
+      const id = hits[0].instanceId;
+      const pl = field.placements[id];
+      if(pl && !pl.broken){
+        pl.broken = true;
+        field.inst.setMatrixAt(id, new THREE.Matrix4().makeScale(0.0001,0.0001,0.0001));
+        field.inst.instanceMatrix.needsUpdate = true;
+        collectOre(field.tier);
+        playTink();
+        if(typeof addShake === 'function') addShake(0.08); // shake sul colpo
+        return hits[0].point;
+      }
+    }
+  }
+  return false;
+}
+function flashCrosshair(){
+  const c = document.getElementById('crosshair');
+  c.classList.add('hit');
+  setTimeout(()=>c.classList.remove('hit'), 130);
+}
+let swingHitFired = false;
+function updatePickaxe(delta, moving, walkT){
+  const idleSway = Math.sin(walkT*7.5)*0.015;
+  let idleY = -0.34;
+  if(moving) idleY += Math.abs(Math.sin(walkT*7.5))*0.02;
+  else idleY += Math.sin(performance.now()*0.0016)*0.008;
+  let swingRot = 0, swingFwd = 0;
+  if(pickaxeSwingT>0){
+    pickaxeSwingT += delta;
+    const p = clamp(pickaxeSwingT/PICKAXE_SWING_DUR, 0, 1);
+    if(!swingHitFired && p>0.38){
+      swingHitFired = true;
+      const hitPoint = tryMineHit();
+      if(hitPoint){
+        flashCrosshair();
+        if(typeof spawnSparks === 'function') spawnSparks(hitPoint);
+      }
+    }
+    const curve = Math.sin(p*Math.PI);
+    swingRot = -curve*0.95;
+    swingFwd = -curve*0.2;
+    if(p>=1){ pickaxeSwingT = 0; swingHitFired = false; }
+  }
+  pickaxeGroup.rotation.set(0.15+swingRot, -0.35, 0.25+idleSway);
+  pickaxeGroup.position.set(0.36, idleY, -0.62+swingFwd);
+}
+
+/* =========================================================================
+   MOTORE DI DIALOGO
+   ========================================================================= */
+let dialogueQueue = [];
+let currentText = '';
+let charIndex = 0;
+let typingSpeed = 0.028;
+let typingTimer = 0;
+let isTyping = false;
+let sequenceEndAction = null;
+
+function runSequence(id){
+  const seq = CONFIG.sequences[id];
+  if(!seq) return;
+  gameState = 'dialogue';
+  document.exitPointerLock();
+  document.getElementById('interactHint').style.display='none';
+  document.getElementById('crosshair').style.display='none';
+  document.getElementById('dialogueWrap').style.display='block';
+  dialogueQueue = [...seq.lines];
+  sequenceEndAction = seq.onEnd || null;
+  nextLine();
+}
+function nextLine(){
+  if(dialogueQueue.length===0){ endSequence(); return; }
+  currentText = dialogueQueue.shift();
+  charIndex=0; typingTimer=0; isTyping=true;
+  document.getElementById('dialogueText').textContent='';
+  document.getElementById('advancePrompt').style.display='none';
+
+  // Avvia il suono di comparsa dei testi
+  if(textSound){
+    textSound.currentTime = 0;
+    textSound.play().catch(e => console.error("Errore riproduzione suono testo:", e));
+  }
+}
+function advanceDialogue(){
+  if(gameState!=='dialogue') return;
+  if(isTyping){
+    isTyping=false;
+    document.getElementById('dialogueText').textContent = currentText;
+    document.getElementById('advancePrompt').style.display='block';
+    // Ferma il suono di comparsa dei testi
+    if(textSound) textSound.pause();
+    return;
+  }
+  nextLine();
+}
+function endSequence(){
+  document.getElementById('dialogueWrap').style.display='none';
+  if(sequenceEndAction==='unlockFinal') finalReady = true;
+  gameState='playing';
+  document.getElementById('crosshair').style.display='block';
+  dom.requestPointerLock();
+  // Sicurezza: ferma il suono di comparsa dei testi
+  if(textSound) textSound.pause();
+}
+document.getElementById('dialogueBox').addEventListener('click', ()=>advanceDialogue());
+
+function triggerEnding(){
+  gameState='ending';
+  document.exitPointerLock();
+  document.getElementById('interactHint').style.display='none';
+  document.getElementById('crosshair').style.display='none';
+  const blackout = document.getElementById('blackout');
+  blackout.style.opacity='1';
+  setTimeout(()=>{
+    if(CONFIG.endingPhotoSrc){
+      const img = document.getElementById('endingPhoto');
+      img.src = CONFIG.endingPhotoSrc;
+      img.style.display = 'block';
+      document.querySelector('#endingPhotoWrap .placeholderMark').style.display = 'none';
+    }
+    document.getElementById('endingMessage').textContent = CONFIG.finalMessage;
+    document.getElementById('endingScreen').style.display='flex';
+    requestAnimationFrame(()=>{ 
+      document.getElementById('endingScreen').style.opacity='1'; 
+      startHugAnimation();
+    });
+  }, 2200);
+}
+document.getElementById('replayBtn').addEventListener('click', ()=>{ location.reload(); });
+
+/* =========================================================================
+   STATO DI GIOCO E CONTROLLI
+   ========================================================================= */
+let gameState = 'title'; // title | playing | dialogue | paused | ending
+const keys = { forward:false, back:false, left:false, right:false };
+let yaw = 0;
+let pitch = 0;
+let mainArcT = 0.001;
+const EYE_HEIGHT = 1.65;
+let walkTime = 0;
+let introWalkT = 0;
+let nearInteractable = null;
+
+const startFrame = mainPath.frameAt(0.001);
+camera.position.set(0, 0.52 + EYE_HEIGHT, 15); // Spawna a Z=15 fuori dalla grotta
+camera.rotation.order = 'YXZ';
+camera.rotation.y = 0; // Visuale rivolta verso il tunnel (-Z)
+
+const dom = renderer.domElement;
+
+document.getElementById('startBtn').addEventListener('click', ()=>{
+  startAudio();
+  document.getElementById('titleScreen').style.display='none';
+  document.getElementById('hud').style.display='block';
+  document.getElementById('hotbar').style.display='flex';
+  gameState='intro_walk';
+  introWalkT = 0;
+  document.getElementById('crosshair').style.display='none';
+});
+
+if(!IS_TOUCH){
+  document.addEventListener('pointerlockchange', ()=>{
+    if(document.pointerLockElement !== dom){
+      if(gameState==='playing'){
+        gameState='paused';
+        document.getElementById('pausedScreen').style.display='flex';
+      }
+    } else {
+      if(gameState==='paused'){
+        gameState='playing';
+        document.getElementById('pausedScreen').style.display='none';
+      }
+    }
+  });
+  document.getElementById('pausedScreen').addEventListener('click', ()=>{ dom.requestPointerLock(); });
+  dom.addEventListener('click', ()=>{ if(gameState==='playing' && document.pointerLockElement!==dom) dom.requestPointerLock(); });
+  dom.addEventListener('mousedown', (e)=>{
+    if(gameState!=='playing') return;
+    if(document.pointerLockElement !== dom){ dom.requestPointerLock(); return; }
+    swingPickaxe();
+  });
+
+  document.addEventListener('mousemove', (e)=>{
+    if(document.pointerLockElement !== dom) return;
+    if(gameState !== 'playing') return;
+    yaw -= e.movementX*0.0022;
+    pitch -= e.movementY*0.0022;
+    pitch = Math.max(-1.25, Math.min(1.25, pitch));
+  });
+}
+
+document.addEventListener('keydown', (e)=>{
+  switch(e.code){
+    case 'KeyW': case 'ArrowUp': keys.forward=true; break;
+    case 'KeyS': case 'ArrowDown': keys.back=true; break;
+    case 'KeyA': case 'ArrowLeft': keys.left=true; break;
+    case 'KeyD': case 'ArrowRight': keys.right=true; break;
+    case 'KeyE': handleInteract(); break;
+    case 'Enter': case 'Space': advanceDialogue(); break;
+  }
+});
+document.addEventListener('keyup', (e)=>{
+  switch(e.code){
+    case 'KeyW': case 'ArrowUp': keys.forward=false; break;
+    case 'KeyS': case 'ArrowDown': keys.back=false; break;
+    case 'KeyA': case 'ArrowLeft': keys.left=false; break;
+    case 'KeyD': case 'ArrowRight': keys.right=false; break;
+  }
+});
+
+function handleInteract(){
+  if(gameState==='playing' && nearInteractable){
+    nearInteractable.action(nearInteractable);
+  }
+}
+
+/* --- punti di trigger passivi lungo il percorso principale --- */
+const passiveTriggers = [
+  { t:T.evento1,          id:'evento1',     done:false },
+  { t:T.quest1-0.015,     id:'quest1_intro',done:false },
+  { t:T.fork-0.012,       id:'fork_intro',  done:false },
+  { t:T.bridge-0.012,     id:'bridge_intro',done:false },
+  { t:T.door-0.012,       id:'door_intro',  done:false },
+  { t:T.soglia,           id:'soglia',      done:false },
+  { t:T.finalCrystal-0.006, id:'cristallo', done:false }
+];
+
+/* =========================================================================
+   RISOLUZIONE POSIZIONE SU UN PERCORSO (clamp laterale + altezza pavimento)
+   ========================================================================= */
+function resolvePosition(path, t, rawX, rawZ){
+  const f = path.frameAt(t);
+  const R = path.baseRadiusAt(t);
+  const dx = rawX-f.center.x, dz = rawZ-f.center.z;
+  const dist = Math.hypot(dx,dz);
+  const maxDist = R*0.72;
+  let px=rawX, pz=rawZ;
+  if(dist>maxDist){
+    const scale = maxDist/Math.max(dist,0.0001);
+    px = f.center.x+dx*scale; pz = f.center.z+dz*scale;
+  }
+  const floorY = f.center.y - R*0.36 + EYE_HEIGHT + fbmNoise(px*0.4,pz*0.4)*0.05;
+  return { px, pz, floorY };
+}
+
+let lastGateHintAt = -999;
+let lastStepPhase = 0;
+let shakeIntensity = 0;
+window.addShake = function(amt){ shakeIntensity = Math.min(shakeIntensity+amt, 0.5); };
+
+function updatePlayer(delta){
+  const speed = 3.6;
+  let moveX=0, moveZ=0;
+  if(keys.forward){ moveX += Math.sin(yaw); moveZ += Math.cos(yaw); }
+  if(keys.back){ moveX -= Math.sin(yaw); moveZ -= Math.cos(yaw); }
+  if(keys.left){ moveX += Math.sin(yaw+Math.PI/2); moveZ += Math.cos(yaw+Math.PI/2); }
+  if(keys.right){ moveX += Math.sin(yaw-Math.PI/2); moveZ += Math.cos(yaw-Math.PI/2); }
+  const len = Math.hypot(moveX,moveZ);
+  const moving = len>0.001;
+  if(moving){ moveX/=len; moveZ/=len; walkTime += delta; }
+
+  const rawX = camera.position.x + moveX*speed*delta*-1;
+  const rawZ = camera.position.z + moveZ*speed*delta*-1;
+  const rawPos = new THREE.Vector3(rawX, camera.position.y, rawZ);
+
+  const mainNear = mainPath.nearestSample(rawPos);
+  const branchNear = branchPath.nearestSample(rawPos);
+  mainArcT = mainNear.t;
+
+  let activePath = mainPath, activeT = clampTForGates(mainNear.t);
+  if(branchNear.distSq < mainNear.distSq){ activePath = branchPath; activeT = branchNear.t; }
+
+  if(activePath===mainPath && mainNear.t > activeT + 0.0004){
+    const hint = activeGateHint(mainNear.t);
+    if(hint && (clock.elapsedTime - lastGateHintAt > 3.5)){
+      lastGateHintAt = clock.elapsedTime;
+      showBanner(hint, 2600);
+    }
+  }
+
+  const { px, pz, floorY } = resolvePosition(activePath, activeT, rawX, rawZ);
+  const stepPhase = Math.sin(walkTime*7.5);
+  const bob = moving ? stepPhase*0.028 : 0;
+  
+  // Scatta il passo ogni volta che l'onda del movimento incrocia lo zero (2 passi per ciclo)
+  if(moving && ((lastStepPhase < 0 && stepPhase >= 0) || (lastStepPhase > 0 && stepPhase <= 0))){
+    if(window.playFootstep) window.playFootstep();
+  }
+  lastStepPhase = stepPhase;
+
+  camera.position.x = px;
+  camera.position.z = pz;
+  camera.position.y = lerp(camera.position.y, floorY+bob, 0.18);
+  camera.rotation.set(pitch, yaw, 0);
+
+  updatePickaxe(delta, moving, walkTime);
+
+  passiveTriggers.forEach(tr=>{
+    if(!tr.done && mainArcT >= tr.t){ tr.done = true; runSequence(tr.id); }
+  });
+
+  let closest=null, closestD=Infinity;
+  interactPoints.forEach(ip=>{
+    if(ip.done) return;
+    const d = camera.position.distanceTo(ip.pos);
+    if(d<ip.radius && d<closestD){ closest=ip; closestD=d; }
+  });
+  nearInteractable = closest;
+
+  let nearMineHint = null;
+  if(!nearInteractable){
+    for(const m of minables){
+      if(m.broken) continue;
+      if(m.kind==='final' && !finalReady) continue;
+      if(camera.position.distanceTo(m.pos)<2.8){ nearMineHint = m.hint || '[ click ]  colpisci'; break; }
+    }
+  }
+  const hintEl = document.getElementById('interactHint');
+  if(gameState==='playing' && nearInteractable){
+    hintEl.textContent = nearInteractable.hint;
+    hintEl.style.display='block';
+  } else if(gameState==='playing' && nearMineHint){
+    hintEl.textContent = nearMineHint;
+    hintEl.style.display='block';
+  } else if(gameState==='playing'){
+    hintEl.style.display='none';
+  }
+
+  updateStageHUD(mainArcT);
+}
+
+/* =========================================================================
+   SISTEMI DI PARTICELLE DINAMICHE
+   ========================================================================= */
+const SPARKS_COUNT = 45;
+const sparksGeo = new THREE.BufferGeometry();
+const sparksPos = new Float32Array(SPARKS_COUNT * 3);
+const sparksVel = new Float32Array(SPARKS_COUNT * 3);
+const sparksLife = new Float32Array(SPARKS_COUNT);
+sparksGeo.setAttribute('position', new THREE.BufferAttribute(sparksPos, 3));
+// Inizializziamo fuori scena
+for(let i=0; i<SPARKS_COUNT; i++) sparksPos[i*3+1] = -999;
+const sparksMat = new THREE.PointsMaterial({ color:0xffaa00, size:0.12, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, map:glowTex });
+const sparksMesh = new THREE.Points(sparksGeo, sparksMat);
+scene.add(sparksMesh);
+
+function spawnSparks(hitP){
+  for(let i=0; i<SPARKS_COUNT; i++){
+    sparksPos[i*3] = hitP.x;
+    sparksPos[i*3+1] = hitP.y;
+    sparksPos[i*3+2] = hitP.z;
+    sparksVel[i*3] = (Math.random()-0.5)*7.0;
+    sparksVel[i*3+1] = Math.random()*5.0 + 2.0;
+    sparksVel[i*3+2] = (Math.random()-0.5)*7.0;
+    sparksLife[i] = Math.random()*0.35 + 0.15;
+  }
+  sparksGeo.attributes.position.needsUpdate = true;
+}
+
+const SPORES_COUNT = 250;
+const sporesGeo = new THREE.BufferGeometry();
+const sporesPos = new Float32Array(SPORES_COUNT * 3);
+const doorCenter = mainPath.surfacePoint(T.door, Math.PI, 0.0);
+for(let i=0; i<SPORES_COUNT; i++){
+  sporesPos[i*3] = doorCenter.x + (Math.random()-0.5)*18;
+  sporesPos[i*3+1] = doorCenter.y + (Math.random()-0.5)*12;
+  sporesPos[i*3+2] = doorCenter.z + (Math.random()-0.5)*18;
+}
+sporesGeo.setAttribute('position', new THREE.BufferAttribute(sporesPos, 3));
+const sporesMat = new THREE.PointsMaterial({ color:0x33aaff, size:0.18, transparent:true, opacity:0.8, blending:THREE.AdditiveBlending, depthWrite:false, map:glowTex });
+const sporesMesh = new THREE.Points(sporesGeo, sporesMat);
+scene.add(sporesMesh);
+
+/* =========================================================================
+   LOOP PRINCIPALE
+   ========================================================================= */
+const clock = new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const delta = Math.min(clock.getDelta(), 0.05);
+  const time = clock.elapsedTime;
+
+  if(gameState==='playing') updatePlayer(delta);
+  updateTweens(delta);
+
+  if(gameState==='intro_walk'){
+    introWalkT += delta;
+    walkTime += delta * 1.0; // passo lento
+    
+    const prog = Math.min(1.0, introWalkT / 9.0); // 9 secondi di intro
+    const currentZ = lerp(15, 0.0, prog); // Cammina da Z=15 fino a Z=0 (ingresso)
+    
+    let duckOffset = 0;
+    if(currentZ < 6.0) {
+      if(currentZ >= 1.0) {
+         // Si abbassa gradualmente verso l'arco
+         const p = (6.0 - currentZ) / 5.0; 
+         duckOffset = -0.7 * Math.sin(p * Math.PI / 2);
+      } else {
+         // Si rialza superato l'arco (dentro la grotta)
+         const p = currentZ / 1.0; 
+         duckOffset = -0.7 * p; 
+      }
+    }
+    
+    const stepPhase = Math.sin(walkTime*7.5);
+    const bob = stepPhase*0.028;
+    camera.position.set(0, 0.52 + EYE_HEIGHT + bob + duckOffset, currentZ);
+    camera.rotation.x = -duckOffset * 0.3; // Abbassa lo sguardo mentre si accuccia
+    
+    // Suoni passi durante la intro
+    if((lastStepPhase < 0 && stepPhase >= 0) || (lastStepPhase > 0 && stepPhase <= 0)){
+      if(window.playFootstep) window.playFootstep();
+    }
+    lastStepPhase = stepPhase;
+
+    if(introWalkT >= 9.0){
+      mainArcT = 0.001;
+      gameState = 'playing';
+      document.getElementById('crosshair').style.display='block';
+      runSequence('intro');
+      const mh = document.getElementById('moveHint');
+      mh.style.opacity='1';
+      setTimeout(()=>{ mh.style.opacity='0'; }, 5500);
+    }
+  }
+
+  if(gameState==='dialogue' && isTyping){
+    typingTimer += delta;
+    while(typingTimer >= typingSpeed && charIndex < currentText.length){
+      typingTimer -= typingSpeed;
+      charIndex++;
+      document.getElementById('dialogueText').textContent = currentText.slice(0,charIndex);
+    }
+    if(charIndex>=currentText.length){
+      isTyping = false;
+      document.getElementById('advancePrompt').style.display='block';
+      // Ferma il suono di comparsa dei testi
+      if(textSound) textSound.pause();
+    }
+  }
+
+  // flicker torce
+  torches.forEach(tr=>{
+    const flick = 0.85 + fbmNoise(time*3+tr.seed, tr.seed)*0.35;
+    if(tr.light) tr.light.intensity = 1.05*flick;
+    tr.flame.scale.setScalar(0.5*flick + 0.1);
+    if(tr.halo){ tr.halo.scale.setScalar(0.95*flick + 0.35); tr.halo.material.opacity = 0.28*flick + 0.14; }
+  });
+
+  // pulsazione del cristallo finale (prima di essere colpito)
+  crystalLight.intensity = 2.0 + finalCrystalRec.hits*1.1 + Math.sin(time*2.2)*0.22;
+  crystalGroup.rotation.y = time*0.12;
+  if(crystalCore){ crystalCore.scale.setScalar(0.9 + Math.sin(time*2.2)*0.12); crystalCore.material.opacity = 0.5 + Math.sin(time*2.2)*0.1; }
+
+  // scintillio dei minerali bianchi
+  oreShimmerMats.forEach(m=>{
+    m.emissiveIntensity = m.userData.baseEmissive * (0.88 + fbmNoise(time*0.5+m.userData.seed, m.userData.seed*1.3)*0.22);
+  });
+
+  // polvere che deriva
+  const dp = dustGeo.attributes.position.array;
+  for(let i=0;i<DUST_COUNT;i++){
+    dp[i*3+1] += delta*0.06;
+    dp[i*3] += Math.sin(time*0.5+i)*0.0015;
+  }
+  dustGeo.attributes.position.needsUpdate = true;
+
+  // particelle dell'esplosione finale
+  if(burstLife>0){
+    burstLife -= delta;
+    const bp = burstGeo.attributes.position.array;
+    for(let i=0;i<BURST_COUNT;i++){
+      bp[i*3]   += burstVel[i*3]*delta;
+      bp[i*3+1] += burstVel[i*3+1]*delta - delta*1.6;
+      bp[i*3+2] += burstVel[i*3+2]*delta;
+    }
+    burstGeo.attributes.position.needsUpdate = true;
+    burstMat.opacity = Math.max(0, burstLife/1.4);
+  }
+
+  // Scintille piccone
+  for(let i=0; i<SPARKS_COUNT; i++){
+    if(sparksLife[i]>0){
+      sparksLife[i] -= delta;
+      sparksVel[i*3+1] -= 15.0 * delta; // gravità forte per scintille
+      sparksPos[i*3] += sparksVel[i*3]*delta;
+      sparksPos[i*3+1] += sparksVel[i*3+1]*delta;
+      sparksPos[i*3+2] += sparksVel[i*3+2]*delta;
+      if(sparksLife[i]<=0) sparksPos[i*3+1] = -999;
+    }
+  }
+  sparksGeo.attributes.position.needsUpdate = true;
+
+  // Spore fluttuanti blu
+  const sp = sporesGeo.attributes.position.array;
+  for(let i=0; i<SPORES_COUNT; i++){
+    sp[i*3+1] += (Math.random() * 0.8 + 0.2) * delta; // salgono lentamente
+    sp[i*3] += Math.sin(time + i)*0.01;
+    if(sp[i*3+1] > doorCenter.y + 6) sp[i*3+1] = doorCenter.y - 6; // respawn in basso
+  }
+  sporesGeo.attributes.position.needsUpdate = true;
+
+  // Animazione Lucciole
+  if(window.firefliesGeo){
+    const ffP = window.firefliesGeo.attributes.position.array;
+    const ffPh = window.firefliesGeo.attributes.phase.array;
+    for(let i=0; i<150; i++){
+      ffP[i*3]   += Math.sin(time*1.5 + ffPh[i])*0.01;
+      ffP[i*3+1] += Math.cos(time*2.0 + ffPh[i])*0.01;
+      ffP[i*3+2] += Math.sin(time*1.8 + ffPh[i]*2)*0.01;
+    }
+    window.firefliesGeo.attributes.position.needsUpdate = true;
+  }
+
+  // Animazione Lucciole Esterne
+  if(window.outdoorFirefliesGeo){
+    const ffP2 = window.outdoorFirefliesGeo.attributes.position.array;
+    const ffPh2 = window.outdoorFirefliesGeo.attributes.phase.array;
+    const ffBase = window.outdoorFirefliesBase;
+    const ffCount = window.outdoorFirefliesCount;
+    for(let i=0; i<ffCount; i++){
+      // Movimento erratico ma rimane vicino alla posizione base
+      ffP2[i*3]   = ffBase[i*3]   + Math.sin(time*0.8 + ffPh2[i]*3.1)*1.5;
+      ffP2[i*3+1] = ffBase[i*3+1] + Math.sin(time*1.2 + ffPh2[i]*2.0)*0.5;
+      ffP2[i*3+2] = ffBase[i*3+2] + Math.cos(time*0.9 + ffPh2[i]*2.7)*1.5;
+    }
+    window.outdoorFirefliesGeo.attributes.position.needsUpdate = true;
+  }
+
+  // Applicazione del tremolio fotocamera
+  if(shakeIntensity > 0.001){
+    camera.position.x += (Math.random()-0.5)*shakeIntensity;
+    camera.position.y += (Math.random()-0.5)*shakeIntensity;
+    camera.position.z += (Math.random()-0.5)*shakeIntensity;
+    shakeIntensity *= Math.pow(0.005, delta); // Decadimento rapidissimo
+  } else {
+    shakeIntensity = 0;
+  }
+
+  composer.render();
+}
+animate();
+
+window.addEventListener('resize', ()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* =========================================================================
+   ANIMAZIONE PIXEL ART FINALE
+   ========================================================================= */
+const hugCanvas = document.getElementById('pixelHugCanvas');
+const hugCtx = hugCanvas.getContext('2d');
+const P = {
+  _: null,          // transparent
+  S: '#ffccaa',     // skin
+  s: '#eebb99',     // skin shade
+  B: '#eedd88',     // blond hair
+  b: '#ccbb66',     // blond hair shade (tied back)
+  G: '#222222',     // black hair (loose)
+  g: '#444444',     // black hair light
+  X: '#3366cc',     // boy shirt
+  Y: '#cc4466',     // girl shirt
+  P: '#444444',     // boy pants
+  p: '#222222',     // girl pants
+  H: '#ff3366'      // heart
+};
+
+const f0 = [
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "__________BBBB_____GGGG_________",
+  "_________bBBBB____GGGGGG________",
+  "________bbBBbS____GSSG_G________",
+  "__________SSSS____GSSS_G________",
+  "___________SSS_____SS__G________",
+  "___________XXX____YYYY_G________",
+  "__________SXXXS__SYYYYSG________",
+  "__________SXXXS__SYYYYSG________",
+  "__________SXXXS__SYYYYS_________",
+  "___________XXX____YYYY__________",
+  "___________PPP____pppp__________",
+  "___________PPP____pppp__________",
+  "___________PPP____pppp__________",
+  "___________PPP____pppp__________",
+  "__________PPPP___pppppp_________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________"
+];
+
+const f1 = [
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "___________BBBBGGGG_____________",
+  "_________bbBBBBGGGGGG___________",
+  "___________SBBSSS_S_G___________",
+  "___________SSSSSSS__G___________",
+  "____________SSSSSS_G____________",
+  "____________XXXYYYG_____________",
+  "___________SXXYYYYYS____________",
+  "___________SXXXYYYYS____________",
+  "____________XXXYYYY_____________",
+  "____________PPPpppp_____________",
+  "____________PPPpppp_____________",
+  "____________PPPpppp_____________",
+  "____________PPPpppp_____________",
+  "___________PPPPpppppp___________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________"
+];
+
+const f2 = [
+  "________________________________",
+  "_______________H________________",
+  "______________HHH_______________",
+  "_______________H________________",
+  "___________BBBBGGGG_____________",
+  "_________bbBBBBGGGGGG___________",
+  "___________SBBSSS_S_G___________",
+  "___________SSSSSSS__G___________",
+  "____________SSSSSS_G____________",
+  "____________XXXYYYG_____________",
+  "___________SXXYYYYYS____________",
+  "___________SXXXYYYYS____________",
+  "____________XXXYYYY_____________",
+  "____________PPPpppp_____________",
+  "____________PPPpppp_____________",
+  "____________PPPpppp_____________",
+  "____________PPPpppp_____________",
+  "___________PPPPpppppp___________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________",
+  "________________________________"
+];
+
+const hugSequence = [f0, f0, f1, f2, f1, f2];
+let hugFrameIdx = 0;
+let hugInterval;
+
+function startHugAnimation() {
+  hugCanvas.style.display = 'block';
+  clearInterval(hugInterval);
+  hugInterval = setInterval(() => {
+    hugCtx.clearRect(0, 0, 32, 32);
+    const data = hugSequence[hugFrameIdx];
+    for(let y=0; y<32; y++) {
+      if(!data[y]) continue;
+      for(let x=0; x<32; x++) {
+        const char = data[y][x];
+        if(P[char]) {
+          hugCtx.fillStyle = P[char];
+          hugCtx.fillRect(x, y, 1, 1);
+        }
+      }
+    }
+    hugFrameIdx = (hugFrameIdx + 1) % hugSequence.length;
+  }, 450);
+}
+/* =========================================================================
+   CONTROLLI MOBILE — joystick, camera touch, pulsante azione
+   ========================================================================= */
+
+if(IS_TOUCH){
+  // ── Mostra controlli mobile, nascondi hint desktop ──
+  document.getElementById('mobileControls').style.display = 'block';
+  document.getElementById('moveHint').textContent = 'trascina a destra per guardare · joystick per muoverti · pulsante per scavare';
+  document.getElementById('interactHint').textContent = 'TOCCA per interagire';
+  document.getElementById('crosshair').style.display = 'block';
+
+  // ── Rilevamento orientamento portrait ──
+  function checkOrientation(){
+    const overlay = document.getElementById('portraitOverlay');
+    if(window.innerHeight > window.innerWidth){
+      overlay.style.display = 'flex';
+    } else {
+      overlay.style.display = 'none';
+    }
+  }
+  window.addEventListener('resize', checkOrientation);
+  window.addEventListener('orientationchange', ()=> setTimeout(checkOrientation, 200));
+  checkOrientation();
+
+  // ── Sovrascrivere il flusso di avvio per mobile (no pointer lock) ──
+  const origStartBtn = document.getElementById('startBtn');
+  const newStartBtn = origStartBtn.cloneNode(true);
+  origStartBtn.parentNode.replaceChild(newStartBtn, origStartBtn);
+  newStartBtn.addEventListener('click', ()=>{
+    startAudio();
+    document.getElementById('titleScreen').style.display='none';
+    document.getElementById('hud').style.display='block';
+    document.getElementById('hotbar').style.display='flex';
+    document.getElementById('muteBtn').style.display='flex';
+    document.getElementById('crosshair').style.display='block';
+    gameState='intro_walk';
+    introWalkT = 0;
+  });
+
+  // ── Disattivare il pointer lock su mobile ──
+  document.getElementById('pausedScreen').textContent = 'Tocca per continuare';
+  document.getElementById('pausedScreen').addEventListener('touchstart', (e)=>{
+    e.preventDefault();
+    if(gameState==='paused'){
+      gameState='playing';
+      document.getElementById('pausedScreen').style.display='none';
+    }
+  }, {passive:false});
+
+  // ── Joystick virtuale ──
+  const joyContainer = document.getElementById('joystickContainer');
+  const joyKnob = document.getElementById('joystickKnob');
+  let joyTouchId = null;
+  let joyCenter = {x:0, y:0};
+  const JOY_RADIUS = 30;
+
+  joyContainer.addEventListener('touchstart', (e)=>{
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    joyTouchId = t.identifier;
+    const rect = joyContainer.getBoundingClientRect();
+    joyCenter.x = rect.left + rect.width/2;
+    joyCenter.y = rect.top + rect.height/2;
+  }, {passive:false});
+
+  joyContainer.addEventListener('touchmove', (e)=>{
+    e.preventDefault();
+    for(let i=0; i<e.changedTouches.length; i++){
+      const t = e.changedTouches[i];
+      if(t.identifier !== joyTouchId) continue;
+      let dx = t.clientX - joyCenter.x;
+      let dy = t.clientY - joyCenter.y;
+      const dist = Math.hypot(dx, dy);
+      if(dist > JOY_RADIUS){ dx = dx/dist*JOY_RADIUS; dy = dy/dist*JOY_RADIUS; }
+      joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+      // Mappare a keys
+      const deadzone = 8;
+      keys.forward = dy < -deadzone;
+      keys.back = dy > deadzone;
+      keys.left = dx < -deadzone;
+      keys.right = dx > deadzone;
+    }
+  }, {passive:false});
+
+  function resetJoystick(){
+    joyTouchId = null;
+    joyKnob.style.transform = 'translate(0,0)';
+    keys.forward = keys.back = keys.left = keys.right = false;
+  }
+  joyContainer.addEventListener('touchend', (e)=>{
+    for(let i=0; i<e.changedTouches.length; i++){
+      if(e.changedTouches[i].identifier === joyTouchId) resetJoystick();
+    }
+  });
+  joyContainer.addEventListener('touchcancel', resetJoystick);
+
+  // ── Camera touch (metà destra dello schermo) ──
+  let camTouchId = null;
+  let camLastX = 0, camLastY = 0;
+  const LOOK_SENSITIVITY = 0.004;
+
+  dom.addEventListener('touchstart', (e)=>{
+    for(let i=0; i<e.changedTouches.length; i++){
+      const t = e.changedTouches[i];
+      // Ignora tocchi sulla metà sinistra (zona joystick) e sui controlli
+      if(t.clientX < window.innerWidth * 0.35) continue;
+      if(camTouchId !== null) continue;
+      camTouchId = t.identifier;
+      camLastX = t.clientX;
+      camLastY = t.clientY;
+    }
+  }, {passive:true});
+
+  dom.addEventListener('touchmove', (e)=>{
+    for(let i=0; i<e.changedTouches.length; i++){
+      const t = e.changedTouches[i];
+      if(t.identifier !== camTouchId) continue;
+      if(gameState !== 'playing') continue;
+      const dx = t.clientX - camLastX;
+      const dy = t.clientY - camLastY;
+      yaw -= dx * LOOK_SENSITIVITY;
+      pitch -= dy * LOOK_SENSITIVITY;
+      pitch = Math.max(-1.25, Math.min(1.25, pitch));
+      camLastX = t.clientX;
+      camLastY = t.clientY;
+    }
+  }, {passive:true});
+
+  function resetCamTouch(){
+    camTouchId = null;
+  }
+  dom.addEventListener('touchend', (e)=>{
+    for(let i=0; i<e.changedTouches.length; i++){
+      if(e.changedTouches[i].identifier === camTouchId) resetCamTouch();
+    }
+  });
+  dom.addEventListener('touchcancel', resetCamTouch);
+
+  // ── Pulsante Azione (scava / interagisci) ──
+  const actionBtn = document.getElementById('mobileActionButton');
+  actionBtn.addEventListener('touchstart', (e)=>{
+    e.preventDefault();
+    if(gameState !== 'playing') return;
+    if(nearInteractable){
+      handleInteract();
+    } else {
+      swingPickaxe();
+    }
+  }, {passive:false});
+
+  // Aggiorna label e stile del pulsante azione nel loop
+  const _origAnimate = window._mobileAnimateHook;
+  (function patchAnimateForMobile(){
+    const origRAF = window.requestAnimationFrame;
+    // Aggiungiamo un check nel resize listener
+    setInterval(()=>{
+      if(!actionBtn) return;
+      if(nearInteractable){
+        actionBtn.textContent = 'USA';
+        actionBtn.classList.add('interact-active');
+      } else {
+        actionBtn.textContent = 'SCAVA';
+        actionBtn.classList.remove('interact-active');
+      }
+    }, 200);
+  })();
+
+  // ── Touch su dialogueBox per avanzare ──
+  document.getElementById('dialogueBox').addEventListener('touchstart', (e)=>{
+    e.preventDefault();
+    advanceDialogue();
+  }, {passive:false});
+
+  // ── Impedire scroll/zoom su mobile ──
+  document.addEventListener('touchmove', (e)=>{
+    if(e.target === dom || e.target.closest('#mobileControls')) return;
+    // Lascia passare solo i touch sui controlli
+  }, {passive:true});
+}
+
+</script>
+</body>
+</html>
